@@ -1,5 +1,14 @@
 # DCF Studio - TODO
 
+## Next up
+
+- [ ] **Hub link card** on `charlie-tren.github.io` pointing at https://dcf-studio.vercel.app
+  (separate repo, deliberately not done as part of this build).
+- [ ] **Bare "woolworths" search does not surface WOW.AX.** Yahoo caps `search` at 5 quotes
+  regardless of `quotesCount`, and for that term all five are the South African Woolworths
+  Holdings plus cross-listings. "woolworths group" ranks WOW.AX first. Options: a
+  region-biased second call (`region: 'AU'` returns a different five), or merging two calls.
+
 ## Post-v1
 
 - [ ] **Dividend-discount model for financials.** Banks and insurers have no meaningful
