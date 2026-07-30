@@ -1,5 +1,6 @@
+import { impliedExpectations, type ImpliedExpectations } from './backsolve';
 import { runDcf } from './dcf';
-import { majorCurrency, toQuoteDisplayUnits } from './fx';
+import { majorCurrency, priceInReportingCurrency, toQuoteDisplayUnits } from './fx';
 import { marketFor } from './markets';
 import { normalise } from './normalise';
 import { resolveRiskFree as liveResolveRiskFree, type RiskFree } from './riskfree';
@@ -45,6 +46,8 @@ export type Valuation = {
   wacc: WaccBreakdown;
   dcf: DcfResult;
   sensitivity: SensitivityGrid;
+  /** What each input would have to be for today's price to be right. */
+  implied: ImpliedExpectations;
   /** Value per share in the units the market quotes in, comparable to price. */
   valuePerShareQuoted: number;
   fxRate: number;
@@ -115,11 +118,21 @@ export async function buildValuation(
       ? 1
       : (await deps.fetchFxRate(fundamentals.reportingCurrency, quoteMajor)) ?? 1;
 
-  const { value: valuePerShareQuoted } = toQuoteDisplayUnits(dcf.gordon.valuePerShare, {
+  const fxContext = {
     reportingCurrency: fundamentals.reportingCurrency,
     quoteCurrency: fundamentals.quoteCurrency,
     fxRate,
-  });
+  };
+  const { value: valuePerShareQuoted } = toQuoteDisplayUnits(dcf.gordon.valuePerShare, fxContext);
+
+  // Backsolve against the price in REPORTING currency, because that is the space
+  // the engine works in. Comparing a quoted pence price to a dollar model would
+  // solve for nonsense.
+  const implied = impliedExpectations(
+    inputs,
+    assumptions,
+    priceInReportingCurrency(fundamentals.price, fxContext)
+  );
 
   const flags: DataQualityFlag[] = [...fundamentals.flags, ...scenario.flags];
   if (wacc.betaClamped) {
@@ -166,6 +179,7 @@ export async function buildValuation(
     wacc,
     dcf,
     sensitivity,
+    implied,
     valuePerShareQuoted,
     fxRate,
     upside: fundamentals.price > 0 ? valuePerShareQuoted / fundamentals.price - 1 : 0,

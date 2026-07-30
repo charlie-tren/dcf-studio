@@ -4,6 +4,7 @@ import { AssumptionPanel } from '../components/AssumptionPanel';
 import { FlagList } from '../components/FlagList';
 import { ForecastTable } from '../components/ForecastTable';
 import { Headline } from '../components/Headline';
+import { ImpliedPanel } from '../components/ImpliedPanel';
 import { SensitivityTable } from '../components/SensitivityTable';
 import { TerminalComparison } from '../components/TerminalComparison';
 import { ValueBar } from '../components/ValueBar';
@@ -103,9 +104,8 @@ export default async function ModelPage({ params, searchParams }: Props) {
         grid={valuation.sensitivity}
         currency={reportingCurrency}
         centrePrice={priceInReporting}
-        centreWacc={valuation.assumptions.wacc}
-        centreGrowth={valuation.assumptions.terminalGrowth}
       />
+      <ImpliedPanel implied={valuation.implied} assumptions={valuation.assumptions} />
 
       <p className="border-t border-[var(--border)] pt-6 text-sm leading-relaxed text-[var(--text-faint)]">
         A DCF tells you what a set of assumptions is worth, not what a share is worth. Change the

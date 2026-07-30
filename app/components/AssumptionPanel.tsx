@@ -106,22 +106,28 @@ function AssumptionPanelInner({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <div className="flex rounded-md border border-[var(--border-strong)] p-0.5">
+        {/*
+          The selected case must be unmistakable. On the first cut it was a dark
+          fill on a light palette and read as unselected - hence "there should be
+          base selected as default" when base already was.
+        */}
+        <div className="flex rounded-md border border-[var(--border-strong)] bg-[var(--bg)] p-0.5">
           {SCENARIOS.map((s) => {
-            const active = shownScenario === s.key && !shownModified;
+            const active = shownScenario === s.key;
             return (
               <button
                 key={s.key}
                 onClick={() => chooseScenario(s.key)}
                 title={s.hint}
                 aria-pressed={active}
-                className={`rounded px-3 py-1.5 text-sm transition-colors duration-100 ${
+                className={`rounded px-3.5 py-1.5 text-sm transition-all duration-100 ${
                   active
-                    ? 'bg-[var(--accent)] font-medium text-[#08120e]'
+                    ? 'bg-[var(--accent)] font-semibold text-[#07110d] shadow-sm'
                     : 'text-[var(--text-dim)] hover:bg-[var(--surface-raised)] hover:text-[var(--text)]'
                 }`}
               >
                 {s.label}
+                {active && shownModified ? ' *' : ''}
               </button>
             );
           })}

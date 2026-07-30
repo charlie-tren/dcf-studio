@@ -93,6 +93,19 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-white">What the market must be assuming</h2>
+        <p className="leading-relaxed text-[var(--text-dim)]">
+          A model that disagrees with the price by 60% is not very useful on its own. So each input is
+          also solved in reverse: what would revenue growth, or margin, or the discount rate have to
+          be for today&apos;s price to be the right answer, holding everything else where the model has
+          it? That turns &quot;this looks expensive&quot; into a claim you can actually judge - Alphabet
+          currently needs about 47% annual revenue growth for five years against 12.5% of history, or
+          a discount rate near 6%. Each line is an alternative, not a set; any one of them on its own
+          closes the gap. Solved by bisection against the same engine that produces the headline.
+        </p>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-xl font-semibold text-white">Where this breaks</h2>
         <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>

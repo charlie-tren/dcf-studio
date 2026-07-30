@@ -9,7 +9,7 @@ export function SiteHeader() {
             DCF Studio
           </span>
           <span className="text-xs text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent)]">
-            valuation, with the workings
+            show me the numbers
           </span>
         </Link>
         <nav className="flex items-center gap-5 text-sm">

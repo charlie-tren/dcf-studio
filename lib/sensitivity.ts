@@ -15,6 +15,16 @@ export type SensitivityGrid = {
   growthValues: number[];
   /** cells[waccIndex][growthIndex]. Null where the perpetuity cannot converge. */
   cells: (number | null)[][];
+  /**
+   * Index of the row and column holding the model as it currently stands.
+   *
+   * Reported explicitly rather than re-derived by the UI: the axis values are
+   * rounded for display (0.106909) while the live WACC is not
+   * (0.10690911670800697), so a float comparison never matched and the centre
+   * cell went unmarked. The grid is built around the centre by construction, so
+   * it knows where it is - the view should not have to guess.
+   */
+  centre: { waccIndex: number; growthIndex: number };
 };
 
 function axis(centre: number, steps: number, step: number): number[] {
@@ -36,5 +46,12 @@ export function sensitivityGrid(inputs: DcfInputs, a: Assumptions, o: GridOption
     })
   );
 
-  return { waccValues, growthValues, cells };
+  return {
+    waccValues,
+    growthValues,
+    cells,
+    // The axes are built symmetrically around the live assumptions, so the
+    // centre is always the middle index - no float matching required.
+    centre: { waccIndex: o.waccSteps, growthIndex: o.growthSteps },
+  };
 }
