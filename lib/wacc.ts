@@ -7,6 +7,17 @@ export const BETA_CEILING = 2.5;
 const DEFAULT_BETA = 1.0;
 /** Spread over the risk-free rate used when interest expense is unavailable. */
 const DEFAULT_DEBT_SPREAD = 0.02;
+/**
+ * Widest credit spread treated as a real corporate funding cost. Single-B paper
+ * prices around 400-600bp over the risk-free and even CCC rarely holds above
+ * 800bp outside distress, so 800bp is the outer edge of credible.
+ *
+ * Beyond it, the interest expense line and the debt line are measuring different
+ * things rather than the company being distressed: CBA implied 20.4% and RBC
+ * 9.4% over, because a bank's interest expense covers deposits while totalDebt
+ * excludes them. A wider band (1500bp) let RBC's 14.0% through unchallenged.
+ */
+const MAX_DEBT_SPREAD = 0.08;
 
 export type WaccArgs = {
   riskFree: RiskFree;
@@ -38,6 +49,13 @@ function resolveCostOfDebt(args: WaccArgs): { rate: number; source: string } {
   const implied = args.interestExpense / averageDebt;
   if (implied < args.riskFree.rate) {
     return { rate: args.riskFree.rate, source: 'Floored at the risk-free rate (implied cost of debt was lower)' };
+  }
+  const ceiling = args.riskFree.rate + MAX_DEBT_SPREAD;
+  if (implied > ceiling) {
+    return {
+      rate: args.riskFree.rate + DEFAULT_DEBT_SPREAD,
+      source: `Implied cost of debt of ${(implied * 100).toFixed(1)}% is not a credible funding cost, so risk-free + ${(DEFAULT_DEBT_SPREAD * 100).toFixed(0)}bp is assumed instead. Interest expense and reported debt are measuring different things - common for banks, whose interest expense includes deposits that total debt excludes.`,
+    };
   }
   return { rate: implied, source: 'Interest expense / average total debt' };
 }

@@ -79,8 +79,10 @@ describe('normalise - fallback chains', () => {
     const synthetic: RawTicker = {
       ...raw,
       statements: raw.statements.map((s) => {
-        const { operatingIncome: _drop, ...rest } = s as Record<string, unknown>;
-        return { ...rest, ebit: undefined } as typeof s;
+        const rest = { ...(s as Record<string, unknown>) };
+        delete rest.operatingIncome;
+        delete rest.ebit;
+        return rest as typeof s;
       }),
     };
     const f = normalise('ARB.AX', synthetic);

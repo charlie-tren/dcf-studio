@@ -65,6 +65,34 @@ describe('buildWacc', () => {
     expect(w.costOfDebtSource).toMatch(/assum/i);
   });
 
+  it('rejects an implausibly wide implied cost of debt', () => {
+    // CBA implied 20.4% and RBC 14.0%, because a bank's interest expense covers
+    // deposits while totalDebt excludes them - the two lines measure different
+    // things. 25% here (500/2000) is far past any real credit spread.
+    const w = buildWacc({ ...BASE, interestExpense: 500 });
+    expect(w.costOfDebt).toBeCloseTo(0.042 + 0.02, 10);
+    expect(w.costOfDebtSource).toMatch(/not a credible funding cost/i);
+  });
+
+  it('rejects a bank-style implied cost of debt just inside a naive ceiling', () => {
+    // RBC's real 14.04% slipped through a 1500bp band. 940bp over the risk-free
+    // is not a AA- bank's funding cost.
+    const w = buildWacc({
+      ...BASE,
+      riskFree: { rate: 0.0462, source: 'test', assumed: false },
+      interestExpense: 280.8,
+    });
+    expect(w.costOfDebt).toBeCloseTo(0.0462 + 0.02, 10);
+    expect(w.costOfDebtSource).toMatch(/not a credible funding cost/i);
+  });
+
+  it('accepts a genuinely wide but credible high-yield spread', () => {
+    // 10% on 2000 of debt is 580bp over a 4.2% risk-free - single-B, but real.
+    const w = buildWacc({ ...BASE, interestExpense: 200 });
+    expect(w.costOfDebt).toBeCloseTo(0.10, 10);
+    expect(w.costOfDebtSource).toMatch(/interest expense/i);
+  });
+
   it('gives a debt-free company a WACC equal to its cost of equity', () => {
     const w = buildWacc({ ...BASE, totalDebt: 0, priorTotalDebt: 0, interestExpense: 0 });
     expect(w.wacc).toBeCloseTo(w.costOfEquity, 10);
