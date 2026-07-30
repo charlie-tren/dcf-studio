@@ -46,6 +46,8 @@ export type FiscalYear = {
   cash: Sourced<number>;
   shares: Sourced<number>;
   interestExpense: Sourced<number> | null;
+  /** Equity + debt - cash, for ROIC. Null where not reported. */
+  investedCapital: Sourced<number> | null;
 };
 
 export type Fundamentals = {
@@ -82,11 +84,17 @@ export type Assumptions = {
   wacc: number;
   midYearConvention: boolean;
   /**
-   * Normalise capex to depreciation in the terminal year. A perpetuity must be a
-   * steady state, and a company cannot outspend its depreciation forever - see
-   * lib/dcf.ts. Off only to reproduce a textbook build that ignores this.
+   * Put the terminal year on a steady-state footing: maintenance capex equal to
+   * depreciation, plus the net reinvestment that terminal growth actually
+   * requires (g / ROIC of NOPAT). See lib/dcf.ts. Off only to reproduce a
+   * textbook build that capitalises the final year's FCFF as reported.
    */
   terminalCapexEqualsDA: boolean;
+  /**
+   * Return on invested capital used for the terminal reinvestment rate.
+   * Null falls back to the WACC, where growth is value-neutral.
+   */
+  terminalRoic: number | null;
 };
 
 export type DcfInputs = {

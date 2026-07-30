@@ -16,7 +16,7 @@ export default function Methodology() {
           Free cashflow to firm is built from drivers rather than taken from a reported total, so
           every line is traceable:
         </p>
-        <pre className="nums overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Revenue(t) = Revenue(t-1) x (1 + growth)
+        <pre className="nums overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Revenue(t) = Revenue(t-1) x (1 + growth)
 EBIT(t)    = Revenue(t) x margin
 NOPAT(t)   = EBIT(t) x (1 - tax rate)
 FCFF(t)    = NOPAT(t) + D&A(t) - Capex(t) - change in NWC(t)`}</pre>
@@ -29,7 +29,7 @@ FCFF(t)    = NOPAT(t) + D&A(t) - Capex(t) - change in NWC(t)`}</pre>
 
       <section className="space-y-3">
         <h2 className="pt-2 text-xl font-semibold text-white">Discount rate</h2>
-        <pre className="nums overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Cost of equity = risk-free + beta x equity risk premium
+        <pre className="nums overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Cost of equity = risk-free + beta x equity risk premium
 Cost of debt   = interest expense / average total debt
 WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <p className="leading-relaxed text-[var(--text-dim)]">
@@ -58,14 +58,25 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
           full <em>t</em> even when the cashflows use the mid-year convention.
         </p>
         <p className="leading-relaxed text-[var(--text-dim)]">
-          One further adjustment matters more than it sounds. A perpetuity is a steady state, and in a
-          steady state capital expenditure settles at roughly the level that maintains the asset base
-          - which is depreciation. Companies mid-buildout break that badly: Alphabet currently spends
-          about 22% of revenue on capex against 5% of depreciation. Carrying that gap forward forever
-          assumes it outspends its own depreciation in perpetuity, which understated its value per
-          share by roughly 44% with no input being wrong. Terminal capex is therefore normalised to
-          depreciation, and the toggle on the model page turns that off if you want the naive version.
-          The explicit forecast years always show the real capex being spent.
+          The terminal year is put on a steady-state footing, which matters more than it sounds and
+          cuts both ways. Carrying a buildout capex rate into perpetuity understates value - Alphabet
+          spends ~22% of revenue on capex against ~5% depreciation, and assuming that gap persists
+          forever cost ~44% of value per share. But setting capex equal to depreciation and then
+          growing the result is the opposite error: zero net reinvestment with positive growth implies
+          infinite return on incremental capital, and overstates terminal value by 9-33%.
+        </p>
+        <p className="leading-relaxed text-[var(--text-dim)]">
+          So the reinvestment identity is applied instead: g = ROIC x reinvestment rate.
+        </p>
+        <pre className="nums overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`FCFF terminal = NOPAT x (1 - g / ROIC)`}</pre>
+        <p className="leading-relaxed text-[var(--text-dim)]">
+          Depreciation covers maintenance; the reinvestment rate funds growth on top. ROIC is NOPAT
+          over invested capital from the company&apos;s own accounts, floored at the WACC - below that,
+          growth destroys value, which on this data usually means invested capital is the wrong
+          denominator (financials) rather than a genuine finding. Both discount at the same convention
+          as the explicit flows: under mid-year the terminal value discounts at n - 0.5, because the
+          perpetuity it capitalises also arrives through the year. The forecast years always show the
+          real capex being spent.
         </p>
       </section>
 
@@ -95,13 +106,12 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       <section className="space-y-3">
         <h2 className="pt-2 text-xl font-semibold text-white">Priced in</h2>
         <p className="leading-relaxed text-[var(--text-dim)]">
-          A model that disagrees with the price by 60% is not very useful on its own. So each input is
-          also solved in reverse: what would revenue growth, or margin, or the discount rate have to
-          be for today&apos;s price to be the right answer, holding everything else where the model has
-          it? That turns &quot;this looks expensive&quot; into a claim you can actually judge - Alphabet
-          currently needs about 47% annual revenue growth for five years against 12.5% of history, or
-          a discount rate near 6%. Each line is an alternative, not a set; any one of them on its own
-          closes the gap. Solved by bisection against the same engine that produces the headline.
+          Each input is also solved in reverse: what would revenue growth, margin, or the discount
+          rate have to be for today&apos;s price to hold, with the others left where the model has them.
+          Bisection against the same engine that produces the headline. Alphabet currently needs ~46%
+          annual revenue growth for five years against 12.5% of history, or a discount rate near 6% -
+          alternatives, not a set. Returns nothing where the price is unreachable in any input, rather
+          than extrapolating past the bracket.
         </p>
       </section>
 

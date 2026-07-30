@@ -43,13 +43,12 @@ export function ForecastTable({
     <section>
       <h2 className="text-lg font-semibold text-white">Forecast Cashflows</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        In {currency}, the currency the accounts are reported in. Outflows carry a minus sign, so the
-        column adds up the way it would on paper.
+        Reporting currency ({currency}). Outflows negative.
       </p>
 
       <FcffChart forecast={dcf.forecast} currency={currency} yearLabels={yearLabels} />
 
-      <div className="mt-5 overflow-x-auto rounded-lg border border-[var(--border)]">
+      <div className="mt-5 overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[var(--surface)] text-left">

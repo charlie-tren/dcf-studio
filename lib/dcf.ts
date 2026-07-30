@@ -58,30 +58,63 @@ function discount(forecast: ForecastYear[], a: Assumptions): number {
 }
 
 function terminalDiscountFactor(a: Assumptions): number {
-  // Terminal value sits at the end of the final explicit year, so it always
-  // discounts at full t, regardless of the convention used for the flows.
-  return 1 / (1 + a.wacc) ** a.horizonYears;
+  // The terminal value is struck at the end of the final explicit year, but it
+  // capitalises a perpetuity of flows that arrive THROUGH each subsequent year.
+  // Under the mid-year convention those flows are half a year closer than a
+  // year-end perpetuity assumes, so the terminal value discounts at n - 0.5 for
+  // the same reason the explicit flows do. Discounting it at full n while
+  // discounting the explicit years at t - 0.5 is internally inconsistent and
+  // understated terminal value by sqrt(1 + WACC) - about 4.9% of it at a 10%
+  // WACC, on the line that is usually 70%+ of the answer.
+  const exponent = a.midYearConvention ? a.horizonYears - 0.5 : a.horizonYears;
+  return 1 / (1 + a.wacc) ** exponent;
 }
 
 /**
- * The cashflow the perpetuity should capitalise, which is NOT always the final
- * explicit year's FCFF.
+ * The cashflow the perpetuity should capitalise, which is NOT the final explicit
+ * year's FCFF for a company still in an investment phase.
  *
- * A perpetuity is a steady state, and in a steady state capital expenditure
- * settles at the level that maintains the asset base - roughly depreciation.
- * Companies in a heavy investment phase break this badly: Alphabet spends 22.7%
- * of revenue on capex against 5.25% of depreciation, a ratio of 3.25x. Carrying
- * that gap into perpetuity assumes it outspends its own depreciation by 10.3% of
- * revenue forever, which understated its value per share by USD 60 - a 44% error
- * that no input was wrong about.
+ * Two errors to avoid, and they pull in opposite directions.
  *
- * So the terminal year normalises capex to D&A. This is the mirror image of the
- * capex floor in lib/scenarios.ts, which catches the opposite distortion (a REIT
- * reporting almost no capex at all).
+ * 1. Carrying today's capex into perpetuity. Alphabet spends 22.7% of revenue on
+ *    capex against 5.25% depreciation (3.25x), mid-datacentre-buildout. Assuming
+ *    it outspends its own depreciation by 10.3% of revenue forever understated
+ *    value per share by ~44%.
+ *
+ * 2. Setting capex = D&A and then growing the result forever. That is zero NET
+ *    reinvestment, so the perpetuity grows at g with no capital behind it -
+ *    growth for free, implying infinite return on new capital. This overstates
+ *    terminal value by 9-33% depending on ROIC.
+ *
+ * The consistent treatment is the reinvestment identity: g = ROIC x reinvestment
+ * rate, so to grow at g a business must reinvest g / ROIC of its NOPAT.
+ * Maintenance capex is covered by depreciation; the reinvestment rate funds
+ * growth on top.
+ *
+ *   FCFF_terminal = NOPAT x (1 - g / ROIC)
+ *
+ * ROIC comes from the company's own accounts where invested capital is
+ * reported, and falls back to the WACC when it is not - at ROIC = WACC the
+ * business earns exactly its cost of capital and growth adds no value, which is
+ * the neutral assumption rather than a flattering one.
  */
 function terminalFcff(finalYear: ForecastYear, a: Assumptions): number {
   if (!a.terminalCapexEqualsDA) return finalYear.fcff;
-  return finalYear.fcff + finalYear.capex - finalYear.dAndA;
+
+  // Maintenance capex only: hold the asset base flat.
+  const maintenanceFcff = finalYear.fcff + finalYear.capex - finalYear.dAndA;
+  if (a.terminalGrowth <= 0) return maintenanceFcff;
+
+  // A ROIC below the cost of capital would mean growth destroys value, and a
+  // ROIC below terminal growth implies reinvesting more than the business earns.
+  // Both show up on financials, where invested capital is not a meaningful
+  // denominator, so floor at the WACC: growth is then value-neutral rather than
+  // value-destroying on what is usually a data artefact.
+  const roic = Math.max(a.terminalRoic ?? a.wacc, a.wacc);
+  const reinvestmentRate = Math.min(a.terminalGrowth / roic, 0.9);
+  // Never let the reinvestment charge flip the perpetuity negative - a negative
+  // terminal value is an artefact of the charge, not a valuation.
+  return Math.max(maintenanceFcff - finalYear.nopat * reinvestmentRate, 0);
 }
 
 function gordonTerminal(finalFcff: number, a: Assumptions): TerminalValue {

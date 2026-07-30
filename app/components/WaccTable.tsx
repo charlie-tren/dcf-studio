@@ -38,9 +38,9 @@ export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string 
     <section>
       <h2 className="text-lg font-semibold text-white">Discount Rate</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        Every component is shown with where it came from, and every one can be overridden above.
+Source shown per component. All overridable above.
       </p>
-      <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--border)]">
+      <div className="mt-4 overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
           <tbody>
             {rows.map((r) => (

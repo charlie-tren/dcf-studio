@@ -112,12 +112,12 @@ export default async function ModelPage({ params, searchParams }: Props) {
       <ImpliedPanel implied={valuation.implied} assumptions={valuation.assumptions} />
 
       <p className="border-t border-[var(--border)] pt-6 text-sm leading-relaxed text-[var(--text-faint)]">
-        Assumptions in, valuation out. Data from Yahoo Finance and the RBA.{' '}
+        Yahoo Finance and RBA data. General information, not advice.{' '}
         <Link
           href="/methodology"
           className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"
         >
-          How this is built
+          Methodology
         </Link>
         .
       </p>

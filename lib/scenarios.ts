@@ -2,6 +2,8 @@ import { marketFor } from './markets';
 import type { Assumptions, DataQualityFlag, Fundamentals, ScenarioName } from './types';
 
 export type HistoricalDrivers = {
+  /** NOPAT / invested capital, median across available years. Null if unusable. */
+  roic: number | null;
   revenueCagr: number;
   ebitMargin: number;
   daPctRevenue: number;
@@ -81,7 +83,19 @@ export function historicalDrivers(f: Fundamentals): HistoricalDrivers {
   const statutory = marketFor(f.ticker).statutoryTaxRate;
   const effectiveTax = taxRates.length > 0 ? median(taxRates) : statutory;
 
+  // ROIC on the company's own accounts. Median across years so one odd balance
+  // sheet cannot set the terminal reinvestment rate.
+  const roicSeries = years
+    .filter((y) => y.investedCapital !== null && y.investedCapital.value > 0)
+    .map((y) => (y.ebit.value * (1 - clamp(effectiveTax, 0, statutory))) / (y.investedCapital as { value: number }).value)
+    .filter((r) => Number.isFinite(r) && r > 0);
+  // Cap at 60%: above that the reinvestment rate is negligible anyway and the
+  // figure usually says invested capital is understated, not that returns are
+  // extraordinary in perpetuity.
+  const roic = roicSeries.length > 0 ? Math.min(median(roicSeries), 0.6) : null;
+
   return {
+    roic,
     revenueCagr,
     ebitMargin: mean(ratios((y) => y.ebit.value)),
     daPctRevenue: mean(ratios((y) => y.dAndA.value)),
@@ -200,6 +214,7 @@ export function buildScenario(
       wacc,
       midYearConvention: true,
       terminalCapexEqualsDA: true,
+      terminalRoic: drivers.roic,
     },
     drivers,
     flags,

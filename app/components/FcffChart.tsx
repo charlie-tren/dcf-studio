@@ -118,7 +118,7 @@ export function FcffChart({
           <span className="inline-block h-2.5 w-2.5 bg-[var(--accent)]" />
           Discounted to today
         </span>
-        <span>Figures in {currency}. The gap between the pair is the cost of time.</span>
+        <span>{currency}</span>
       </figcaption>
     </figure>
   );

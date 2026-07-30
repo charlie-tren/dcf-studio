@@ -30,11 +30,10 @@ export function ImpliedPanel({
     <section>
       <h2 className="text-lg font-semibold text-white">Priced In</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        What each input would need to be for today&apos;s price to hold, with everything else left
-        where it is. Any one on its own closes the gap.
+Each input solved to today&apos;s price, holding the others. Alternatives, not a set.
       </p>
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--border)]">
+      <div className="mt-4 overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[var(--surface)]">
@@ -42,10 +41,10 @@ export function ImpliedPanel({
                 Input
               </th>
               <th className="px-4 py-2.5 text-right text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
-                This model
+Model
               </th>
               <th className="px-4 py-2.5 text-right text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
-                Implied by the price
+Implied
               </th>
               <th className="px-4 py-2.5 text-right text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
                 Gap

@@ -12,15 +12,11 @@ const EXAMPLES = [
 export default function Home() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-20">
-      <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-        What is a company
-        <br />
-        actually worth?
+      <h1 className="text-4xl font-semibold tracking-tight text-white">
+        DCF on any listed company
       </h1>
-      <p className="mt-5 max-w-xl text-lg leading-relaxed text-[var(--text-dim)]">
-        Type a name. You get a discounted cashflow model built from that company&apos;s own reported
-        numbers, with every assumption exposed and every line traceable back to the figure it came
-        from.
+      <p className="mt-4 max-w-xl text-lg text-[var(--text-dim)]">
+        Built off reported financials. Every driver editable, every line traceable to source.
       </p>
 
       <div className="mt-10">
@@ -30,7 +26,6 @@ export default function Home() {
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-[var(--text-faint)]">Try</span>
         {EXAMPLES.map((e) => (
           <Link
             key={e.symbol}
@@ -42,31 +37,34 @@ export default function Home() {
         ))}
       </div>
 
-      <div className="mt-16 grid gap-6 border-t border-[var(--border)] pt-8 sm:grid-cols-3">
+      <dl className="mt-16 grid gap-6 border-t border-[var(--border)] pt-8 sm:grid-cols-3">
         {[
           {
-            h: 'Nothing hidden',
-            p: 'The cashflow build, the discount rate and the bridge to equity value are all on the page. Change any input and watch it move.',
+            h: 'Coverage',
+            p: 'ASX and US on live risk-free rates. LSE, Xetra, Euronext, HKEX, Tokyo, Toronto, SIX, NSE, Korea, NZX on documented assumptions.',
           },
           {
-            h: 'It says when it is wrong',
-            p: 'A DCF misprices banks, and reported capex misleads for property trusts. The model flags those cases instead of quietly producing a number.',
+            h: 'Reverse DCF',
+            p: 'Solves the price for implied growth, margin and discount rate, so the market’s expectations are on the page next to yours.',
           },
           {
-            h: 'Free data',
-            p: 'Statements and prices from Yahoo Finance, Australian rates from the RBA. Four to five years of history, which is the real limit here.',
+            h: 'Known limits',
+            p: 'Financials flagged as out-of-model. Four to five years of history. Terminal capex normalised to a steady state with growth charged at g/ROIC.',
           },
         ].map((c) => (
           <div key={c.h}>
-            <h2 className="text-sm font-medium text-[var(--text)]">{c.h}</h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-faint)]">{c.p}</p>
+            <dt className="text-sm font-medium text-[var(--text)]">{c.h}</dt>
+            <dd className="mt-1.5 text-sm leading-relaxed text-[var(--text-faint)]">{c.p}</dd>
           </div>
         ))}
-      </div>
+      </dl>
 
-      <p className="mt-10 text-sm text-[var(--text-faint)]">
-        <Link href="/methodology" className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline">
-          How the numbers are put together
+      <p className="mt-10 text-sm">
+        <Link
+          href="/methodology"
+          className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"
+        >
+          Methodology
         </Link>
       </p>
     </main>

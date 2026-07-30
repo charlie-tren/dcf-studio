@@ -24,16 +24,23 @@ export function SensitivityTable({
   const hi = Math.max(...values);
   const span = hi - lo || 1;
 
-  // Intensity scales with value across the grid; hue says which side of today's
-  // price it lands on. Two channels, so the reading survives without colour.
+  // Diverging scale centred on the model's OWN answer, not the market price.
+  // Shading against the price meant every cell went red the moment a company
+  // looked expensive - a whole grid of red carries no information about how the
+  // value actually moves. Centring on the model gives a real gradient in both
+  // directions, and cells that clear today's price are marked separately.
+  const centreValue = grid.cells[grid.centre.waccIndex][grid.centre.growthIndex] ?? lo;
+
   function cellStyle(value: number | null) {
     if (value === null) return {};
-    const t = (value - lo) / span;
+    const above = value >= centreValue;
+    const range = above ? hi - centreValue : centreValue - lo;
+    const t = range <= 0 ? 0 : Math.abs(value - centreValue) / range;
+    const alpha = (0.05 + t * 0.24).toFixed(3);
     return {
-      backgroundColor:
-        value > centrePrice
-          ? `rgba(74, 157, 127, ${(0.06 + t * 0.26).toFixed(3)})`
-          : `rgba(194, 104, 95, ${(0.05 + (1 - t) * 0.18).toFixed(3)})`,
+      backgroundColor: above
+        ? `rgba(74, 157, 127, ${alpha})`
+        : `rgba(194, 104, 95, ${alpha})`,
     };
   }
 
@@ -41,11 +48,10 @@ export function SensitivityTable({
     <section>
       <h2 className="text-lg font-semibold text-white">Sensitivity</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        Value per share in {currency} across the two assumptions that swing a DCF hardest. Green
-        beats today&apos;s price, red falls short.
+Value per share ({currency}) by discount rate and long-run growth.
       </p>
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--border)]">
+      <div className="mt-4 overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)]">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
@@ -97,7 +103,9 @@ export function SensitivityTable({
                         className={`nums px-5 py-3.5 text-right whitespace-nowrap ${
                           isCentre
                             ? 'font-semibold text-white outline-2 -outline-offset-2 outline-[var(--accent)]'
-                            : 'text-[var(--text-dim)]'
+                            : cell !== null && cell > centrePrice
+                              ? 'font-medium text-[var(--accent)]'
+                              : 'text-[var(--text-dim)]'
                         }`}
                       >
                         {cell === null ? '—' : cell.toFixed(2)}
@@ -111,9 +119,8 @@ export function SensitivityTable({
         </table>
       </div>
       <p className="mt-2.5 text-xs text-[var(--text-faint)]">
-        Outlined cell: this model, at {pct(grid.waccValues[grid.centre.waccIndex], 2)} and{' '}
-        {pct(grid.growthValues[grid.centre.growthIndex], 2)} growth. A dash means growth met the
-        discount rate, where a perpetuity stops converging.
+        Outlined: this model. Green text: above today&apos;s price of{' '}
+        {centrePrice.toFixed(2)}. Shading: distance from this model&apos;s own value.
       </p>
     </section>
   );

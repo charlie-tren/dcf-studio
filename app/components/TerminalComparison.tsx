@@ -18,8 +18,7 @@ export function TerminalComparison({ v }: { v: Valuation }) {
     <section>
       <h2 className="text-lg font-semibold text-white">Terminal Value</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        Most of the answer usually sits beyond the forecast. Two ways of pricing it - a gap between
-        them is worth more than either number alone.
+Perpetuity growth and exit multiple, side by side.
       </p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -51,7 +50,7 @@ export function TerminalComparison({ v }: { v: Valuation }) {
                   />
                 </div>
                 <p className="mt-1.5 text-xs text-[var(--text-faint)]">
-                  {pct(m.terminal.shareOfEv, 0)} of the value is in the terminal figure
+                  {pct(m.terminal.shareOfEv, 0)} of EV
                 </p>
 
                 <dl className="nums mt-4 space-y-1.5 border-t border-[var(--border)] pt-3 text-sm">
@@ -76,7 +75,7 @@ export function TerminalComparison({ v }: { v: Valuation }) {
 
       {gap !== null && (
         <p className="mt-3 text-sm text-[var(--text-dim)]">
-          The two methods are {pct(gap, 0)} apart.
+Spread between methods: {pct(gap, 0)}.
         </p>
       )}
     </section>

@@ -45,13 +45,13 @@ export function Headline({ v }: { v: Valuation }) {
       </div>
 
       <p className="mt-5 text-sm text-[var(--text-dim)]">
-        {v.assumptions.horizonYears}-year forecast, Gordon growth terminal value,{' '}
-        {v.assumptions.midYearConvention ? 'mid-year' : 'year-end'} discounting.{' '}
+        {v.assumptions.horizonYears}y forecast · perpetuity growth TV ·{' '}
+        {v.assumptions.midYearConvention ? 'mid-year' : 'year-end'} discounting ·{' '}
         <span className="text-[var(--text-faint)]">
-          {v.scenario.charAt(0).toUpperCase() + v.scenario.slice(1)} case
-          {v.modified ? ', edited' : ''}.
+          {v.scenario} case
+          {v.modified ? ', edited' : ''}
           {v.fxRate !== 1
-            ? ` Built in ${v.fundamentals.reportingCurrency}, converted at ${v.fxRate.toFixed(4)}.`
+            ? ` · ${v.fundamentals.reportingCurrency} model at ${v.fxRate.toFixed(4)}`
             : ''}
         </span>
       </p>

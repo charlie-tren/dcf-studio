@@ -15,6 +15,7 @@ const A: Assumptions = {
   wacc: 0.10,
   midYearConvention: false,
   terminalCapexEqualsDA: false,
+  terminalRoic: null,
 };
 const I: DcfInputs = { baseRevenue: 1000, netDebt: 500, dilutedShares: 100 };
 

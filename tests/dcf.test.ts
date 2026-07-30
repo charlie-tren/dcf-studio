@@ -18,6 +18,7 @@ export const REF_ASSUMPTIONS: Assumptions = {
   // Off in the reference model so the hand-computed terminal value stays a
   // plain Gordon growth off year-5 FCFF. Its own tests turn it on.
   terminalCapexEqualsDA: false,
+  terminalRoic: null,
 };
 
 export const REF_INPUTS: DcfInputs = {
@@ -102,12 +103,32 @@ describe('runDcf - terminal value', () => {
     expect(r.exitMultiple.terminal.presentValue).toBeCloseTo(expected / 1.1 ** 5, 4);
   });
 
-  it('discounts the terminal value at full t even under the mid-year convention', () => {
-    // Terminal value sits at the end of year n by construction, so it is not
-    // shifted half a year. Only the explicit cashflows are.
+  it('discounts the terminal value on the same convention as the flows', () => {
+    // The TV capitalises a perpetuity of flows arriving THROUGH each later year,
+    // so under mid-year they are half a year closer, exactly as the explicit
+    // flows are. Discounting the TV at full n while the flows use t - 0.5 is
+    // internally inconsistent and understates the largest line by sqrt(1+WACC).
+    const undiscounted = (178.6202 * 1.025) / 0.075;
+    const end = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    expect(end.gordon.terminal.presentValue).toBeCloseTo(undiscounted / 1.1 ** 5, 4);
+
     const mid = runDcf(REF_INPUTS, { ...REF_ASSUMPTIONS, midYearConvention: true });
-    const expected = (178.6202 * 1.025) / 0.075;
-    expect(mid.gordon.terminal.presentValue).toBeCloseTo(expected / 1.1 ** 5, 4);
+    expect(mid.gordon.terminal.presentValue).toBeCloseTo(undiscounted / 1.1 ** 4.5, 4);
+    expect(mid.gordon.terminal.presentValue).toBeCloseTo(
+      end.gordon.terminal.presentValue * Math.sqrt(1.1),
+      4
+    );
+  });
+
+  it('scales the WHOLE valuation by sqrt(1 + WACC) between conventions', () => {
+    // With both the flows and the TV on the same convention, switching should
+    // be a clean uniform shift - a good check that nothing is half-converted.
+    const end = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    const mid = runDcf(REF_INPUTS, { ...REF_ASSUMPTIONS, midYearConvention: true });
+    expect(mid.gordon.enterpriseValue).toBeCloseTo(
+      end.gordon.enterpriseValue * Math.sqrt(1.1),
+      6
+    );
   });
 
   it('blocks Gordon growth when terminal growth meets or exceeds WACC', () => {
@@ -139,22 +160,49 @@ describe('runDcf - terminal capex normalisation', () => {
     terminalCapexEqualsDA: true,
   };
 
-  it('capitalises a steady-state cashflow, not the final year FCFF', () => {
-    const r = runDcf(REF_INPUTS, HEAVY_INVESTOR);
+  it('capitalises a steady-state cashflow net of the reinvestment growth requires', () => {
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.20 });
     const final = r.forecast[4];
-    // Terminal FCFF adds back the excess of capex over depreciation.
-    const steadyState = final.fcff + final.capex - final.dAndA;
-    const expected = (steadyState * 1.025) / (0.10 - 0.025);
+    // Maintenance capex only, then subtract g/ROIC of NOPAT for growth.
+    const maintenance = final.fcff + final.capex - final.dAndA;
+    const reinvestment = final.nopat * (0.025 / 0.20);
+    const expected = ((maintenance - reinvestment) * 1.025) / (0.10 - 0.025);
     expect(r.gordon.terminal.undiscounted).toBeCloseTo(expected, 2);
-    expect(r.gordon.terminal.undiscounted).toBeGreaterThan(
-      (final.fcff * 1.025) / (0.10 - 0.025)
-    );
   });
 
-  it('values a heavy investor materially higher than the naive build', () => {
+  it('charges for growth: zero net reinvestment would overstate the perpetuity', () => {
+    // capex = D&A alone means the business grows at g on no new capital, which
+    // implies infinite return on incremental investment. Overstates TV by
+    // 9-33% depending on ROIC.
+    const withCharge = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.15 });
+    const final = withCharge.forecast[4];
+    const freeGrowth = ((final.fcff + final.capex - final.dAndA) * 1.025) / 0.075;
+    expect(withCharge.gordon.terminal.undiscounted).toBeLessThan(freeGrowth);
+  });
+
+  it('charges less reinvestment the higher the return on capital', () => {
+    const low = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.10 });
+    const high = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.30 });
+    expect(high.gordon.valuePerShare).toBeGreaterThan(low.gordon.valuePerShare);
+  });
+
+  it('falls back to the WACC when ROIC is unknown, where growth adds no value', () => {
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: null });
+    const atWacc = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.10 });
+    expect(r.gordon.valuePerShare).toBeCloseTo(atWacc.gordon.valuePerShare, 6);
+  });
+
+  it('applies no reinvestment charge at zero terminal growth', () => {
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalGrowth: 0, terminalRoic: 0.2 });
+    const final = r.forecast[4];
+    const maintenance = final.fcff + final.capex - final.dAndA;
+    expect(r.gordon.terminal.undiscounted).toBeCloseTo(maintenance / 0.10, 2);
+  });
+
+  it('values a heavy investor higher than carrying peak capex forever', () => {
     const naive = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalCapexEqualsDA: false });
-    const fixed = runDcf(REF_INPUTS, HEAVY_INVESTOR);
-    expect(fixed.gordon.valuePerShare).toBeGreaterThan(naive.gordon.valuePerShare * 1.2);
+    const fixed = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.20 });
+    expect(fixed.gordon.valuePerShare).toBeGreaterThan(naive.gordon.valuePerShare);
   });
 
   it('warns when it has normalised a large capex gap', () => {
@@ -162,11 +210,12 @@ describe('runDcf - terminal capex normalisation', () => {
     expect(r.warnings.some((w) => /steady state/i.test(w))).toBe(true);
   });
 
-  it('changes nothing when capex already equals depreciation', () => {
+  it('still charges for growth even when capex already equals depreciation', () => {
+    // No capex normalisation needed, but growth must still be paid for.
     const steady = { ...REF_ASSUMPTIONS, capexPctRevenue: 0.05, daPctRevenue: 0.05 };
     const off = runDcf(REF_INPUTS, steady);
-    const on = runDcf(REF_INPUTS, { ...steady, terminalCapexEqualsDA: true });
-    expect(on.gordon.valuePerShare).toBeCloseTo(off.gordon.valuePerShare, 8);
+    const on = runDcf(REF_INPUTS, { ...steady, terminalCapexEqualsDA: true, terminalRoic: 0.15 });
+    expect(on.gordon.valuePerShare).toBeLessThan(off.gordon.valuePerShare);
     expect(on.warnings.some((w) => /steady state/i.test(w))).toBe(false);
   });
 

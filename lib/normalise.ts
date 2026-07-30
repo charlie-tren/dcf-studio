@@ -108,6 +108,25 @@ function changeInNwc(
   );
 }
 
+/**
+ * Capital the business actually has at work, for ROIC. Prefers the reported
+ * line; otherwise equity + debt - cash, which is the standard construction.
+ */
+function investedCapital(row: RawStatementRow): Sourced<number> | null {
+  const reported = firstOf(row, ['investedCapital']);
+  if (reported && reported.value > 0) return reported;
+
+  const equity = num(row, 'stockholdersEquity') ?? num(row, 'totalEquityGrossMinorityInterest');
+  const debt = num(row, 'totalDebt');
+  const cash =
+    num(row, 'cashCashEquivalentsAndShortTermInvestments') ?? num(row, 'cashAndCashEquivalents');
+  if (equity === null) return null;
+  const value = equity + (debt ?? 0) - (cash ?? 0);
+  return value > 0
+    ? derivedValue(value, 'Shareholders equity + total debt - cash')
+    : null;
+}
+
 function buildYear(
   row: RawStatementRow,
   previous: RawStatementRow | undefined,
@@ -167,6 +186,7 @@ function buildYear(
     cash: firstOf(row, CASH_CHAIN) ?? derivedValue(0, 'No cash balance reported'),
     shares: firstOf(row, SHARES_CHAIN) ?? derivedValue(0, 'No share count reported'),
     interestExpense,
+    investedCapital: investedCapital(row),
   };
 }
 

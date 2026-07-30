@@ -80,8 +80,7 @@ export function ValueBar({ v }: { v: Valuation }) {
       </div>
 
       <p className="mt-5 border-t border-[var(--border)] pt-4 text-xs text-[var(--text-faint)]">
-        Both methods discount the same forecast; they differ only in how they value the years beyond
-        it. The percentages are against today&apos;s price.
+Same forecast, different terminal treatment. Percentages vs price.
       </p>
     </section>
   );

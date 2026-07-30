@@ -141,28 +141,27 @@ function AssumptionPanelInner({
         </button>
         <button
           onClick={() => push({ mid: assumptions.midYearConvention ? '0' : '1' })}
-          title="Whether cash is assumed to arrive through the year or all on the last day"
+          title="Mid-year: flows and terminal value discounted at t - 0.5"
           className="rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm text-[var(--text-dim)] transition-colors duration-100 hover:border-[var(--accent)] hover:text-[var(--text)]"
         >
           {assumptions.midYearConvention ? 'Mid-year' : 'Year-end'} discounting
         </button>
         <button
           onClick={() => push({ tcx: assumptions.terminalCapexEqualsDA ? '0' : '1' })}
-          title="In a steady state, capex settles at roughly depreciation. Turning this off carries today's capex into perpetuity."
+          title="On: maintenance capex at depreciation, plus g/ROIC of NOPAT reinvested to fund terminal growth. Off: capitalises the final year's FCFF as forecast."
           className={`rounded-md border px-3 py-1.5 text-sm transition-colors duration-100 ${
             assumptions.terminalCapexEqualsDA
               ? 'border-[var(--border-strong)] text-[var(--text-dim)] hover:border-[var(--accent)] hover:text-[var(--text)]'
               : 'border-[var(--negative)] text-[var(--negative)]'
           }`}
         >
-          Terminal capex {assumptions.terminalCapexEqualsDA ? '= depreciation' : 'as forecast'}
+          Terminal: {assumptions.terminalCapexEqualsDA ? 'steady state' : 'as forecast'}
         </button>
       </div>
 
       {shownModified && (
         <p className="mt-3 text-xs text-[var(--text-faint)]">
-          Edited from the {shownScenario} case. Your changes are in the URL - copy it to share this
-          exact model.
+Edited from {shownScenario}. State is in the URL.
         </p>
       )}
 
