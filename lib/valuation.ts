@@ -144,6 +144,14 @@ export async function buildValuation(
         'Free cashflow is negative in at least one forecast year, so terminal value carries most of the valuation.',
     });
   }
+  // The engine raises its own warnings (terminal capex normalisation, negative
+  // cashflow). Surface them as flags so they actually reach the page - they were
+  // being computed and then silently dropped.
+  for (const warning of dcf.warnings) {
+    if (/steady state/i.test(warning)) {
+      flags.push({ code: 'CAPEX_BELOW_DA', severity: 'warn', message: warning });
+    }
+  }
   if (dcf.gordon.terminal.blocked) {
     flags.push({
       code: 'TERMINAL_GROWTH_BLOCKED',

@@ -2,44 +2,69 @@ import { money, pct } from '@/lib/format';
 import type { WaccBreakdown } from '@/lib/types';
 
 export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string }) {
-  const rows: [string, string, string][] = [
-    [
-      'Risk-free rate',
-      pct(w.riskFreeRate, 2),
-      w.riskFreeAssumed ? `${w.riskFreeSource} (assumption)` : w.riskFreeSource,
-    ],
-    ['Equity risk premium', pct(w.equityRiskPremium, 2), 'Market assumption, editable'],
-    [
-      'Beta',
-      w.beta.toFixed(3),
-      w.betaClamped ? `Clamped from a reported ${w.rawBeta?.toFixed(3)}` : 'As reported',
-    ],
-    ['Cost of equity', pct(w.costOfEquity, 2), 'Risk-free + beta x equity risk premium'],
-    ['Cost of debt', pct(w.costOfDebt, 2), w.costOfDebtSource],
-    ['Market capitalisation', money(w.marketCap, currency), `${pct(w.equityWeight, 1)} of capital`],
-    [
-      'Total debt',
-      money(w.totalDebt, currency),
-      `${pct(w.debtWeight, 1)} of capital, book value as a proxy`,
-    ],
-    ['Tax rate', pct(w.taxRate, 1), 'Effective, capped at statutory'],
-    ['WACC', pct(w.wacc, 2), 'E/V x Re + D/V x Rd x (1 - t)'],
+  const rows: { label: string; value: string; note: string; total?: boolean }[] = [
+    {
+      label: 'Risk-free rate',
+      value: pct(w.riskFreeRate, 2),
+      note: w.riskFreeAssumed ? `${w.riskFreeSource} (assumption)` : w.riskFreeSource,
+    },
+    { label: 'Equity risk premium', value: pct(w.equityRiskPremium, 2), note: 'Market assumption' },
+    {
+      label: 'Beta',
+      value: w.beta.toFixed(3),
+      note: w.betaClamped ? `Clamped from a reported ${w.rawBeta?.toFixed(3)}` : 'As reported',
+    },
+    {
+      label: 'Cost of equity',
+      value: pct(w.costOfEquity, 2),
+      note: 'Risk-free + beta x equity risk premium',
+    },
+    { label: 'Cost of debt', value: pct(w.costOfDebt, 2), note: w.costOfDebtSource },
+    {
+      label: 'Market capitalisation',
+      value: money(w.marketCap, currency),
+      note: `${pct(w.equityWeight, 1)} of capital`,
+    },
+    {
+      label: 'Total debt',
+      value: money(w.totalDebt, currency),
+      note: `${pct(w.debtWeight, 1)} of capital, book value as a proxy`,
+    },
+    { label: 'Tax rate', value: pct(w.taxRate, 1), note: 'Effective, capped at statutory' },
+    { label: 'WACC', value: pct(w.wacc, 2), note: 'E/V x Re + D/V x Rd x (1 - t)', total: true },
   ];
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">Discount rate</h2>
-      <div className="mt-3 overflow-x-auto">
+      <h2 className="text-lg font-semibold text-white">Discount rate</h2>
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
+        Every component is shown with where it came from, and every one can be overridden above.
+      </p>
+      <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
           <tbody>
-            {rows.map(([label, value, note], i) => (
+            {rows.map((r) => (
               <tr
-                key={label}
-                className={`border-b border-neutral-100 ${i === rows.length - 1 ? 'font-semibold' : ''}`}
+                key={r.label}
+                className={`border-t border-[var(--border)] first:border-t-0 ${
+                  r.total ? 'border-t-[var(--border-strong)] bg-[var(--surface-raised)]' : ''
+                }`}
               >
-                <td className="py-2 pr-4 text-neutral-600">{label}</td>
-                <td className="py-2 pr-4 text-right tabular-nums">{value}</td>
-                <td className="py-2 text-sm text-neutral-500">{note}</td>
+                <td
+                  className={`px-4 py-2.5 whitespace-nowrap ${
+                    r.total ? 'font-medium text-[var(--text)]' : 'text-[var(--text-dim)]'
+                  }`}
+                >
+                  {r.label}
+                </td>
+                <td
+                  className={`nums px-4 py-2.5 text-right whitespace-nowrap ${
+                    r.total ? 'font-semibold text-[var(--accent)]' : 'text-[var(--text)]'
+                  }`}
+                >
+                  {r.value}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-[var(--text-faint)]">{r.note}</td>
               </tr>
             ))}
           </tbody>

@@ -6,6 +6,7 @@ import { ForecastTable } from '../components/ForecastTable';
 import { Headline } from '../components/Headline';
 import { SensitivityTable } from '../components/SensitivityTable';
 import { TerminalComparison } from '../components/TerminalComparison';
+import { ValueBar } from '../components/ValueBar';
 import { WaccTable } from '../components/WaccTable';
 import { priceInReportingCurrency } from '@/lib/fx';
 import { decodeState } from '@/lib/urlstate';
@@ -43,13 +44,18 @@ export default async function ModelPage({ params, searchParams }: Props) {
     });
   } catch (error) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-2xl font-semibold">Cannot model {decodeURIComponent(ticker)}</h1>
-        <p className="mt-3 text-neutral-600">
+      <main className="mx-auto max-w-3xl px-6 py-20">
+        <h1 className="text-2xl font-semibold text-white">
+          Cannot model {decodeURIComponent(ticker)}
+        </h1>
+        <p className="mt-3 text-[var(--text-dim)]">
           {error instanceof Error ? error.message : 'Something went wrong.'}
         </p>
-        <Link href="/" className="mt-6 inline-block underline">
-          Try another company
+        <Link
+          href="/"
+          className="mt-6 inline-block text-sm text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"
+        >
+          Search for another company
         </Link>
       </main>
     );
@@ -66,18 +72,21 @@ export default async function ModelPage({ params, searchParams }: Props) {
   });
 
   return (
-    <main className="mx-auto max-w-5xl space-y-10 px-6 py-12">
-      <Link href="/" className="text-sm underline">
-        New search
-      </Link>
-
+    <main className="mx-auto max-w-5xl space-y-12 px-6 py-10">
       <Headline v={valuation} />
-      <FlagList flags={valuation.flags} />
-      {valuation.notes.map((note) => (
-        <p key={note} className="text-sm text-neutral-600">
-          {note}
-        </p>
-      ))}
+
+      {valuation.flags.length > 0 && <FlagList flags={valuation.flags} />}
+      {valuation.notes.length > 0 && (
+        <div className="space-y-1">
+          {valuation.notes.map((note) => (
+            <p key={note} className="text-sm text-[var(--text-faint)]">
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <ValueBar v={valuation} />
 
       <Suspense fallback={null}>
         <AssumptionPanel
@@ -94,14 +103,19 @@ export default async function ModelPage({ params, searchParams }: Props) {
         grid={valuation.sensitivity}
         currency={reportingCurrency}
         centrePrice={priceInReporting}
+        centreWacc={valuation.assumptions.wacc}
+        centreGrowth={valuation.assumptions.terminalGrowth}
       />
 
-      <p className="border-t border-neutral-200 pt-6 text-sm text-neutral-500">
-        General information only, not financial advice. This is what these assumptions imply, not
-        what the share is worth. Data from Yahoo Finance and the Reserve Bank of Australia, and may
-        be stale or wrong.{' '}
-        <Link href="/methodology" className="underline">
-          Methodology
+      <p className="border-t border-[var(--border)] pt-6 text-sm leading-relaxed text-[var(--text-faint)]">
+        A DCF tells you what a set of assumptions is worth, not what a share is worth. Change the
+        assumptions and the answer changes - that is the point of showing them. Figures come from
+        Yahoo Finance and the RBA and can be wrong or out of date.{' '}
+        <Link
+          href="/methodology"
+          className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"
+        >
+          How this is built
         </Link>
         .
       </p>

@@ -15,6 +15,9 @@ export const REF_ASSUMPTIONS: Assumptions = {
   exitMultiple: 8,
   wacc: 0.10,
   midYearConvention: false,
+  // Off in the reference model so the hand-computed terminal value stays a
+  // plain Gordon growth off year-5 FCFF. Its own tests turn it on.
+  terminalCapexEqualsDA: false,
 };
 
 export const REF_INPUTS: DcfInputs = {
@@ -121,6 +124,71 @@ describe('runDcf - terminal value', () => {
     const g = r.gordon;
     expect(g.terminal.shareOfEv).toBeCloseTo(g.terminal.presentValue / g.enterpriseValue, 10);
     expect(g.terminal.shareOfEv).toBeGreaterThan(0.6);
+  });
+});
+
+describe('runDcf - terminal capex normalisation', () => {
+  // Alphabet spends 22.7% of revenue on capex against 5.25% depreciation, a
+  // ratio of 3.25x, because it is mid-datacentre-buildout. Carrying that into
+  // perpetuity assumes it outspends its own depreciation forever and understated
+  // its value per share by USD 60 - a 44% error with no wrong input anywhere.
+  const HEAVY_INVESTOR = {
+    ...REF_ASSUMPTIONS,
+    capexPctRevenue: 0.2270,
+    daPctRevenue: 0.0525,
+    terminalCapexEqualsDA: true,
+  };
+
+  it('capitalises a steady-state cashflow, not the final year FCFF', () => {
+    const r = runDcf(REF_INPUTS, HEAVY_INVESTOR);
+    const final = r.forecast[4];
+    // Terminal FCFF adds back the excess of capex over depreciation.
+    const steadyState = final.fcff + final.capex - final.dAndA;
+    const expected = (steadyState * 1.025) / (0.10 - 0.025);
+    expect(r.gordon.terminal.undiscounted).toBeCloseTo(expected, 2);
+    expect(r.gordon.terminal.undiscounted).toBeGreaterThan(
+      (final.fcff * 1.025) / (0.10 - 0.025)
+    );
+  });
+
+  it('values a heavy investor materially higher than the naive build', () => {
+    const naive = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalCapexEqualsDA: false });
+    const fixed = runDcf(REF_INPUTS, HEAVY_INVESTOR);
+    expect(fixed.gordon.valuePerShare).toBeGreaterThan(naive.gordon.valuePerShare * 1.2);
+  });
+
+  it('warns when it has normalised a large capex gap', () => {
+    const r = runDcf(REF_INPUTS, HEAVY_INVESTOR);
+    expect(r.warnings.some((w) => /steady state/i.test(w))).toBe(true);
+  });
+
+  it('changes nothing when capex already equals depreciation', () => {
+    const steady = { ...REF_ASSUMPTIONS, capexPctRevenue: 0.05, daPctRevenue: 0.05 };
+    const off = runDcf(REF_INPUTS, steady);
+    const on = runDcf(REF_INPUTS, { ...steady, terminalCapexEqualsDA: true });
+    expect(on.gordon.valuePerShare).toBeCloseTo(off.gordon.valuePerShare, 8);
+    expect(on.warnings.some((w) => /steady state/i.test(w))).toBe(false);
+  });
+
+  it('leaves the explicit forecast years untouched', () => {
+    const r = runDcf(REF_INPUTS, HEAVY_INVESTOR);
+    // Only the terminal value is normalised - the visible cashflows still show
+    // the real capex the company is spending.
+    expect(r.forecast[4].capex / r.forecast[4].revenue).toBeCloseTo(0.227, 8);
+  });
+
+  it('does not inflate a company that under-invests', () => {
+    // The adjustment cuts both ways: capex below depreciation reduces terminal
+    // cashflow rather than flattering it.
+    const underInvestor = {
+      ...REF_ASSUMPTIONS,
+      capexPctRevenue: 0.02,
+      daPctRevenue: 0.08,
+      terminalCapexEqualsDA: true,
+    };
+    const naive = runDcf(REF_INPUTS, { ...underInvestor, terminalCapexEqualsDA: false });
+    const fixed = runDcf(REF_INPUTS, underInvestor);
+    expect(fixed.gordon.valuePerShare).toBeLessThan(naive.gordon.valuePerShare);
   });
 });
 

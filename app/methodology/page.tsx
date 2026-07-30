@@ -4,23 +4,23 @@ export const metadata = { title: 'Methodology - DCF Studio' };
 
 export default function Methodology() {
   return (
-    <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
-      <Link href="/" className="text-sm underline">
-        Back
+    <main className="mx-auto max-w-3xl space-y-9 px-6 py-12">
+      <Link href="/" className="text-sm text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline">
+        Back to search
       </Link>
-      <h1 className="text-3xl font-semibold tracking-tight">Methodology</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-white">Methodology</h1>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">The cashflow build</h2>
-        <p className="text-neutral-700">
+        <h2 className="text-xl font-semibold text-white">The cashflow build</h2>
+        <p className="leading-relaxed text-[var(--text-dim)]">
           Free cashflow to firm is built from drivers rather than taken from a reported total, so
           every line is traceable:
         </p>
-        <pre className="overflow-x-auto rounded bg-neutral-100 p-4 text-sm">{`Revenue(t) = Revenue(t-1) x (1 + growth)
+        <pre className="nums overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Revenue(t) = Revenue(t-1) x (1 + growth)
 EBIT(t)    = Revenue(t) x margin
 NOPAT(t)   = EBIT(t) x (1 - tax rate)
 FCFF(t)    = NOPAT(t) + D&A(t) - Capex(t) - change in NWC(t)`}</pre>
-        <p className="text-neutral-700">
+        <p className="leading-relaxed text-[var(--text-dim)]">
           An increase in net working capital is a cash outflow and is subtracted. Yahoo reports the
           working-capital movement with the opposite sign, as a cashflow contribution, so it is
           flipped once during normalisation.
@@ -28,16 +28,16 @@ FCFF(t)    = NOPAT(t) + D&A(t) - Capex(t) - change in NWC(t)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Discount rate</h2>
-        <pre className="overflow-x-auto rounded bg-neutral-100 p-4 text-sm">{`Cost of equity = risk-free + beta x equity risk premium
+        <h2 className="text-xl font-semibold text-white">Discount rate</h2>
+        <pre className="nums overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Cost of equity = risk-free + beta x equity risk premium
 Cost of debt   = interest expense / average total debt
 WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
-        <p className="text-neutral-700">
+        <p className="leading-relaxed text-[var(--text-dim)]">
           Risk-free rates are sourced live for the US (10-year Treasury) and Australia (RBA F2 table,
           the 10-year Australian Government series). Every other market uses a documented assumption,
           labelled as such on the model page.
         </p>
-        <p className="text-neutral-700">
+        <p className="leading-relaxed text-[var(--text-dim)]">
           Two guards apply, because reported inputs are sometimes not what they claim to be. Beta is
           clamped to a range of 0.3 to 2.5: reported betas are occasionally negative, and a cost of
           equity below the risk-free rate is not a defensible discount rate. The cost of debt is
@@ -49,19 +49,29 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Terminal value</h2>
-        <p className="text-neutral-700">
+        <h2 className="text-xl font-semibold text-white">Terminal value</h2>
+        <p className="leading-relaxed text-[var(--text-dim)]">
           Both methods are shown, because terminal value is usually most of the answer and the gap
           between the two is the honest measure of how much rests on assumption. Gordon growth
           requires terminal growth below the WACC; where it is not, the calculation is blocked rather
           than fudged. Terminal value sits at the end of the final explicit year, so it discounts at
           full <em>t</em> even when the cashflows use the mid-year convention.
         </p>
+        <p className="leading-relaxed text-[var(--text-dim)]">
+          One further adjustment matters more than it sounds. A perpetuity is a steady state, and in a
+          steady state capital expenditure settles at roughly the level that maintains the asset base
+          - which is depreciation. Companies mid-buildout break that badly: Alphabet currently spends
+          about 22% of revenue on capex against 5% of depreciation. Carrying that gap forward forever
+          assumes it outspends its own depreciation in perpetuity, which understated its value per
+          share by roughly 44% with no input being wrong. Terminal capex is therefore normalised to
+          depreciation, and the toggle on the model page turns that off if you want the naive version.
+          The explicit forecast years always show the real capex being spent.
+        </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Scenario presets</h2>
-        <ul className="list-disc space-y-1 pl-5 text-neutral-700">
+        <h2 className="text-xl font-semibold text-white">Scenario presets</h2>
+        <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>
             <strong>Base</strong> - revenue CAGR, mean EBIT margin, mean capex and D&amp;A as a share
             of revenue, and the median effective tax rate, all from the company&apos;s own reported
@@ -83,8 +93,8 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Where this breaks</h2>
-        <ul className="list-disc space-y-1 pl-5 text-neutral-700">
+        <h2 className="text-xl font-semibold text-white">Where this breaks</h2>
+        <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>
             <strong>Banks and insurers.</strong> They report no meaningful operating income, and
             capex and working capital do not mean what this model assumes. A dividend-discount or
@@ -114,15 +124,15 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Data sources</h2>
-        <p className="text-neutral-700">
+        <h2 className="text-xl font-semibold text-white">Data sources</h2>
+        <p className="leading-relaxed text-[var(--text-dim)]">
           Statements, prices, betas, analyst estimates and FX from Yahoo Finance. Australian
           risk-free rates from the Reserve Bank of Australia (F2, capital market yields). Both are
           free sources and neither is guaranteed accurate or current. Not affiliated with Yahoo.
         </p>
       </section>
 
-      <p className="border-t border-neutral-200 pt-6 text-sm text-neutral-500">
+      <p className="border-t border-[var(--border)] pt-6 text-sm text-[var(--text-faint)]">
         General information only, not financial advice.
       </p>
     </main>

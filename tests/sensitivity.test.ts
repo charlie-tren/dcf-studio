@@ -14,6 +14,7 @@ const A: Assumptions = {
   exitMultiple: 8,
   wacc: 0.10,
   midYearConvention: false,
+  terminalCapexEqualsDA: false,
 };
 const I: DcfInputs = { baseRevenue: 1000, netDebt: 500, dilutedShares: 100 };
 

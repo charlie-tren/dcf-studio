@@ -194,6 +194,7 @@ export function buildScenario(
       exitMultiple: DEFAULT_EXIT_MULTIPLE,
       wacc,
       midYearConvention: true,
+      terminalCapexEqualsDA: true,
     },
     drivers,
     flags,

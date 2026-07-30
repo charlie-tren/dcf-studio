@@ -63,6 +63,27 @@ function terminalDiscountFactor(a: Assumptions): number {
   return 1 / (1 + a.wacc) ** a.horizonYears;
 }
 
+/**
+ * The cashflow the perpetuity should capitalise, which is NOT always the final
+ * explicit year's FCFF.
+ *
+ * A perpetuity is a steady state, and in a steady state capital expenditure
+ * settles at the level that maintains the asset base - roughly depreciation.
+ * Companies in a heavy investment phase break this badly: Alphabet spends 22.7%
+ * of revenue on capex against 5.25% of depreciation, a ratio of 3.25x. Carrying
+ * that gap into perpetuity assumes it outspends its own depreciation by 10.3% of
+ * revenue forever, which understated its value per share by USD 60 - a 44% error
+ * that no input was wrong about.
+ *
+ * So the terminal year normalises capex to D&A. This is the mirror image of the
+ * capex floor in lib/scenarios.ts, which catches the opposite distortion (a REIT
+ * reporting almost no capex at all).
+ */
+function terminalFcff(finalYear: ForecastYear, a: Assumptions): number {
+  if (!a.terminalCapexEqualsDA) return finalYear.fcff;
+  return finalYear.fcff + finalYear.capex - finalYear.dAndA;
+}
+
 function gordonTerminal(finalFcff: number, a: Assumptions): TerminalValue {
   if (a.terminalGrowth >= a.wacc) {
     return {
@@ -115,11 +136,17 @@ export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
   const pvExplicit = discount(forecast, a);
 
   const finalYear = forecast[forecast.length - 1];
-  const gordonTv = gordonTerminal(finalYear.fcff, a);
+  const steadyStateFcff = terminalFcff(finalYear, a);
+  const gordonTv = gordonTerminal(steadyStateFcff, a);
   const exitTv = exitMultipleTerminal(finalYear, a);
 
   const warnings: string[] = [];
   if (gordonTv.blocked) warnings.push(gordonTv.blocked);
+  if (a.terminalCapexEqualsDA && finalYear.capex > finalYear.dAndA * 1.25) {
+    warnings.push(
+      `Capital expenditure runs at ${((finalYear.capex / finalYear.revenue) * 100).toFixed(1)}% of revenue against depreciation of ${((finalYear.dAndA / finalYear.revenue) * 100).toFixed(1)}%. A perpetuity has to be a steady state, so terminal capex is normalised to depreciation - otherwise the model assumes the company outspends its own depreciation forever.`
+    );
+  }
   if (forecast.some((y) => y.fcff < 0)) {
     warnings.push('Free cashflow to firm is negative in at least one forecast year, so terminal value carries most of the valuation.');
   }

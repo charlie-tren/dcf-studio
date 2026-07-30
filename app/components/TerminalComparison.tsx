@@ -4,8 +4,11 @@ import type { Valuation } from '@/lib/valuation';
 export function TerminalComparison({ v }: { v: Valuation }) {
   const currency = v.fundamentals.reportingCurrency;
   const methods = [
-    { label: `Gordon growth at ${pct(v.assumptions.terminalGrowth, 2)}`, m: v.dcf.gordon },
-    { label: `Exit multiple at ${v.assumptions.exitMultiple.toFixed(1)}x EBITDA`, m: v.dcf.exitMultiple },
+    { label: `Perpetuity growth at ${pct(v.assumptions.terminalGrowth, 2)}`, m: v.dcf.gordon },
+    {
+      label: `Exit multiple at ${v.assumptions.exitMultiple.toFixed(1)}x EBITDA`,
+      m: v.dcf.exitMultiple,
+    },
   ];
 
   const [a, b] = methods.map((x) => x.m.valuePerShare);
@@ -13,50 +16,69 @@ export function TerminalComparison({ v }: { v: Valuation }) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">Terminal value, both ways</h2>
-      <p className="mt-1 text-sm text-neutral-500">
-        Terminal value is usually most of the answer. The gap between the two methods is the honest
-        measure of how much of this valuation is assumption.
+      <h2 className="text-lg font-semibold text-white">What happens after year {v.assumptions.horizonYears}</h2>
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
+        Usually most of the answer sits here, in the years nobody forecasts. Two standard ways of
+        putting a number on it, side by side - if they disagree, that tells you more than either one
+        alone.
       </p>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {methods.map(({ label, m }) => (
-          <div key={label} className="rounded border border-neutral-200 p-4">
-            <p className="text-sm font-medium">{label}</p>
+          <div
+            key={label}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5"
+          >
+            <p className="text-sm font-medium text-[var(--text)]">{label}</p>
             {m.terminal.blocked ? (
-              <p className="mt-2 text-sm text-red-700">{m.terminal.blocked}</p>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--negative)]">
+                {m.terminal.blocked}
+              </p>
             ) : (
-              <dl className="mt-2 space-y-1 text-sm tabular-nums">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-neutral-500">Undiscounted</dt>
-                  <dd>{money(m.terminal.undiscounted, currency)}</dd>
+              <>
+                <div className="mt-4 flex items-baseline justify-between gap-4">
+                  <span className="text-xs tracking-wide text-[var(--text-faint)] uppercase">
+                    Value per share
+                  </span>
+                  <span className="nums text-2xl font-semibold text-[var(--accent)]">
+                    {perShare(m.valuePerShare, currency)}
+                  </span>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-neutral-500">Present value</dt>
-                  <dd>{money(m.terminal.presentValue, currency)}</dd>
+
+                <div className="mt-4 h-1 w-full overflow-hidden rounded bg-[var(--border)]">
+                  <div
+                    className="h-full bg-[var(--accent)] opacity-70"
+                    style={{ width: `${Math.min(m.terminal.shareOfEv * 100, 100)}%` }}
+                  />
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-neutral-500">Share of enterprise value</dt>
-                  <dd>{pct(m.terminal.shareOfEv, 1)}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-neutral-500">Enterprise value</dt>
-                  <dd>{money(m.enterpriseValue, currency)}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-neutral-500">Less net debt</dt>
-                  <dd>{money(m.enterpriseValue - m.equityValue, currency)}</dd>
-                </div>
-                <div className="flex justify-between gap-4 border-t border-neutral-200 pt-1 font-medium">
-                  <dt>Value per share</dt>
-                  <dd>{perShare(m.valuePerShare, currency)}</dd>
-                </div>
-              </dl>
+                <p className="mt-1.5 text-xs text-[var(--text-faint)]">
+                  {pct(m.terminal.shareOfEv, 0)} of the value is in the terminal figure
+                </p>
+
+                <dl className="nums mt-4 space-y-1.5 border-t border-[var(--border)] pt-3 text-sm">
+                  {[
+                    ['Terminal value, undiscounted', money(m.terminal.undiscounted, currency)],
+                    ['Terminal value, discounted', money(m.terminal.presentValue, currency)],
+                    ['Enterprise value', money(m.enterpriseValue, currency)],
+                    ['Less net debt', money(m.enterpriseValue - m.equityValue, currency)],
+                    ['Equity value', money(m.equityValue, currency)],
+                  ].map(([k, val]) => (
+                    <div key={k} className="flex justify-between gap-4">
+                      <dt className="text-[var(--text-faint)]">{k}</dt>
+                      <dd className="text-[var(--text-dim)]">{val}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
             )}
           </div>
         ))}
       </div>
+
       {gap !== null && (
-        <p className="mt-3 text-sm text-neutral-600">The two methods differ by {pct(gap, 0)}.</p>
+        <p className="mt-3 text-sm text-[var(--text-dim)]">
+          The two methods are {pct(gap, 0)} apart.
+        </p>
       )}
     </section>
   );

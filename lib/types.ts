@@ -81,6 +81,12 @@ export type Assumptions = {
   exitMultiple: number;
   wacc: number;
   midYearConvention: boolean;
+  /**
+   * Normalise capex to depreciation in the terminal year. A perpetuity must be a
+   * steady state, and a company cannot outspend its depreciation forever - see
+   * lib/dcf.ts. Off only to reproduce a textbook build that ignores this.
+   */
+  terminalCapexEqualsDA: boolean;
 };
 
 export type DcfInputs = {

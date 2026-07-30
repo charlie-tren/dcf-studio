@@ -31,6 +31,9 @@ export function encodeState(state: UrlState): string {
   if (state.overrides.midYearConvention !== undefined) {
     p.set('mid', state.overrides.midYearConvention ? '1' : '0');
   }
+  if (state.overrides.terminalCapexEqualsDA !== undefined) {
+    p.set('tcx', state.overrides.terminalCapexEqualsDA ? '1' : '0');
+  }
   if (state.overrides.revenueGrowth) p.set('g', state.overrides.revenueGrowth.join('|'));
   if (state.overrides.ebitMargin) p.set('m', state.overrides.ebitMargin.join('|'));
 
@@ -59,6 +62,8 @@ export function decodeState(query: string): UrlState {
   }
   const mid = p.get('mid');
   if (mid === '0' || mid === '1') overrides.midYearConvention = mid === '1';
+  const tcx = p.get('tcx');
+  if (tcx === '0' || tcx === '1') overrides.terminalCapexEqualsDA = tcx === '1';
 
   const g = numberArray(p.get('g'));
   if (g) overrides.revenueGrowth = g;

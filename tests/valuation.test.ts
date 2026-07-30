@@ -65,6 +65,19 @@ describe('buildValuation', () => {
     expect(v.flags.some((x) => x.code === 'CURRENCY_MISMATCH')).toBe(true);
   });
 
+  it('surfaces engine warnings as flags rather than dropping them', async () => {
+    // runDcf raises a warning when it normalises a large capex gap. That warning
+    // was being computed and then never rendered, because nothing read
+    // dcf.warnings. MSFT spends ~17% of revenue on capex against ~9% D&A.
+    const v = await buildValuation(
+      'MSFT',
+      { scenario: 'base', horizonYears: 5, overrides: { capexPctRevenue: 0.25, daPctRevenue: 0.05 } },
+      deps('MSFT')
+    );
+    expect(v.dcf.warnings.some((w) => /steady state/i.test(w))).toBe(true);
+    expect(v.flags.some((f) => /steady state/i.test(f.message))).toBe(true);
+  });
+
   it('honours the requested horizon', async () => {
     const v = await buildValuation('MSFT', { scenario: 'base', horizonYears: 10 }, deps('MSFT'));
     expect(v.dcf.forecast).toHaveLength(10);
