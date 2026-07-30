@@ -43,8 +43,9 @@ even for A$600m ASX small caps (Jumbo Interactive, n=11).
 
 ## 3. Stack
 
-Next.js (App Router) + TypeScript, deployed on Vercel. `yahoo-finance2` v3 for the data
-layer (note: v3 requires `new YahooFinance()`, not the v2 default export).
+Next.js (App Router) + TypeScript, deployed on Vercel. `yahoo-finance2` v4 for the data
+layer (note: v4 requires `new YahooFinance()`, not the v2 default export - the data
+probe on 30/07/2026 validated v4.0.0 specifically).
 
 Data fetching is server-side, in a route handler. This is a constraint, not a
 preference: browser-side calls to Yahoo fail CORS, and the server route is the only

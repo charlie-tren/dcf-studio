@@ -6,7 +6,7 @@
 
 **Architecture:** Bottom-up. The pure DCF engine (no I/O, no clock) is built and tested first against a hand-computed reference model. The data layer sits behind it: one module owns all Yahoo calls, one owns normalisation and every fallback chain, and recorded JSON fixtures mean tests never hit the network. A thin orchestrator composes them, a server route exposes it, and the UI renders the workings rather than just the answer.
 
-**Tech Stack:** Next.js 15 (App Router) + TypeScript, `yahoo-finance2` v3, vitest, Tailwind, deployed on Vercel.
+**Tech Stack:** Next.js 16 (App Router) + TypeScript, `yahoo-finance2` v4, vitest 4, Tailwind 4, deployed on Vercel.
 
 **Spec:** `docs/superpowers/specs/2026-07-30-dcf-studio-design.md`
 
@@ -1080,7 +1080,7 @@ Create `lib/yahoo.ts`:
 ```typescript
 import YahooFinance from 'yahoo-finance2';
 
-// v3 requires instantiation. The v2 default-export-as-object pattern throws.
+// v4 requires instantiation. The v2 default-export-as-object pattern throws.
 const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 export type RawStatementRow = Record<string, unknown> & { date?: unknown; periodType?: string };
