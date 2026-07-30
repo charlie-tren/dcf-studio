@@ -92,6 +92,31 @@ describe('normalise - fallback chains', () => {
     expect(y.ebit.value).toBeGreaterThan(y.pretaxIncome.value);
   });
 
+  it('nets off short-term investments, not just cash on hand', () => {
+    // Alphabet holds USD 30.7bn cash against USD 96.1bn of short-term
+    // investments; MSFT is similar. Taking cashAndCashEquivalents first
+    // understated cash by the securities balance and overstated net debt by the
+    // same, costing roughly USD 8 a share on GOOGL. Broadest measure wins.
+    const raw = fixture('MSFT');
+    const s = raw.statements[0] as Record<string, unknown>;
+    const broad = s.cashCashEquivalentsAndShortTermInvestments as number;
+    const narrow = s.cashAndCashEquivalents as number;
+    expect(broad).toBeGreaterThan(narrow);
+
+    const f = normalise('MSFT', raw);
+    expect(f.years[0].cash.value).toBeCloseTo(broad, 2);
+    expect(f.years[0].cash.provenance.sourceField).toBe(
+      'cashCashEquivalentsAndShortTermInvestments'
+    );
+  });
+
+  it('falls back to plain cash where no securities balance is reported', () => {
+    // CBA reports no combined line, so the narrow field is correct there.
+    const f = normalise('CBA.AX', fixture('CBA.AX'));
+    expect(f.years[0].cash.provenance.sourceField).toBe('cashAndCashEquivalents');
+    expect(f.years[0].cash.value).toBeGreaterThan(0);
+  });
+
   it('normalises capex to a positive outflow', () => {
     for (const t of ['MSFT', 'BHP.AX', 'ARB.AX']) {
       const f = normalise(t, fixture(t));

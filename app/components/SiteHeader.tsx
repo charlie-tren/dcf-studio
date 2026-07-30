@@ -3,16 +3,14 @@ import Link from 'next/link';
 export function SiteHeader() {
   return (
     <header className="border-b border-[var(--border)]">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-        <Link href="/" className="group flex items-baseline gap-2">
-          <span className="text-base font-semibold tracking-tight text-[var(--text)]">
-            DCF Studio
-          </span>
-          <span className="text-xs text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent)]">
-            show me the numbers
-          </span>
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+        <Link
+          href="/"
+          className="text-xl font-semibold tracking-tight text-white transition-colors hover:text-[var(--accent)]"
+        >
+          DCF Studio
         </Link>
-        <nav className="flex items-center gap-5 text-sm">
+        <nav className="flex items-center gap-6 text-sm">
           <Link
             href="/methodology"
             className="text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
@@ -25,7 +23,7 @@ export function SiteHeader() {
             rel="noopener noreferrer"
             className="text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
           >
-            Other projects
+            Other Projects <span aria-hidden="true">↗</span>
           </a>
         </nav>
       </div>

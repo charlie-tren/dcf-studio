@@ -16,11 +16,10 @@ export function TerminalComparison({ v }: { v: Valuation }) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-white">What happens after year {v.assumptions.horizonYears}</h2>
+      <h2 className="text-lg font-semibold text-white">Terminal Value</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        Usually most of the answer sits here, in the years nobody forecasts. Two standard ways of
-        putting a number on it, side by side - if they disagree, that tells you more than either one
-        alone.
+        Most of the answer usually sits beyond the forecast. Two ways of pricing it - a gap between
+        them is worth more than either number alone.
       </p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

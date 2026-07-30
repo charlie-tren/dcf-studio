@@ -1,75 +1,88 @@
-import { perShare } from '@/lib/format';
+import { perShare, signedPct } from '@/lib/format';
 import type { Valuation } from '@/lib/valuation';
 
 /**
- * Where the two methods land against the market price, on one axis. The point
- * is the spread between them: a wide spread means the answer is mostly
- * assumption, and a single headline number hides that.
+ * Where the two methods land against the market price. The spread between them
+ * is the point: a wide spread means the answer is mostly assumption, and a
+ * single headline number hides that.
+ *
+ * Laid out as labelled rows with proportional bars rather than points on a
+ * shared axis. On the axis version the two model values sat almost on top of
+ * each other in the left third of the chart while the price sat far right, so
+ * the labels collided and the bar read as empty space.
  */
 export function ValueBar({ v }: { v: Valuation }) {
   const ccy = v.fundamentals.quoteCurrency;
-  const scaleToQuote = v.dcf.gordon.valuePerShare === 0
-    ? 1
-    : v.valuePerShareQuoted / v.dcf.gordon.valuePerShare;
+  const scaleToQuote =
+    v.dcf.gordon.valuePerShare === 0 ? 1 : v.valuePerShareQuoted / v.dcf.gordon.valuePerShare;
 
-  const marks = [
-    { label: 'Gordon growth', value: v.valuePerShareQuoted, kind: 'model' as const },
+  const rows = [
+    {
+      label: 'Perpetuity growth',
+      value: v.valuePerShareQuoted,
+      kind: 'model' as const,
+    },
     {
       label: 'Exit multiple',
       value: v.dcf.exitMultiple.valuePerShare * scaleToQuote,
       kind: 'model' as const,
     },
     { label: 'Market price', value: v.fundamentals.price, kind: 'market' as const },
-  ].filter((m) => Number.isFinite(m.value));
+  ].filter((r) => Number.isFinite(r.value));
 
-  const values = marks.map((m) => m.value);
-  const lo = Math.min(...values, 0);
-  const hi = Math.max(...values);
-  const span = hi - lo || 1;
-  const pad = span * 0.12;
-  const axisLo = lo - pad;
-  const axisHi = hi + pad;
-  const pos = (val: number) => ((val - axisLo) / (axisHi - axisLo)) * 100;
+  const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
 
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
-      <h2 className="text-sm font-medium text-[var(--text-dim)]">Value per share, by method</h2>
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+      <h2 className="text-sm font-medium tracking-wide text-[var(--text-dim)] uppercase">
+        Value Per Share
+      </h2>
 
-      <div className="relative mt-8 mb-14 h-px w-full bg-[var(--border-strong)]">
-        {marks.map((m, i) => {
-          const isMarket = m.kind === 'market';
-          const above = i === 0;
+      <div className="mt-5 space-y-3.5">
+        {rows.map((r) => {
+          const isMarket = r.kind === 'market';
+          const width = Math.max((Math.abs(r.value) / max) * 100, 1.5);
+          const negative = r.value < 0;
           return (
-            <div
-              key={m.label}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${pos(m.value)}%` }}
-            >
-              <div
-                className={
+            <div key={r.label} className="flex items-center gap-4">
+              <span className="w-36 shrink-0 text-sm text-[var(--text-dim)]">{r.label}</span>
+              <div className="relative h-6 flex-1 overflow-hidden rounded-sm bg-[var(--bg)]">
+                <div
+                  className={`h-full rounded-sm ${
+                    isMarket
+                      ? 'bg-[var(--border-strong)]'
+                      : negative
+                        ? 'bg-[var(--negative)] opacity-70'
+                        : 'bg-[var(--accent)] opacity-80'
+                  }`}
+                  style={{ width: `${width}%` }}
+                />
+              </div>
+              <span
+                className={`nums w-28 shrink-0 text-right text-sm font-medium ${
                   isMarket
-                    ? 'h-6 w-0.5 bg-[var(--text-dim)]'
-                    : 'h-3 w-3 rounded-full border-2 border-[var(--bg)] bg-[var(--accent)]'
-                }
-              />
-              <div
-                className={`absolute left-1/2 w-max -translate-x-1/2 text-center ${
-                  above ? 'bottom-5' : 'top-5'
+                    ? 'text-[var(--text)]'
+                    : negative
+                      ? 'text-[var(--negative)]'
+                      : 'text-[var(--accent)]'
                 }`}
               >
-                <div
-                  className={`nums text-sm font-medium ${
-                    isMarket ? 'text-[var(--text-dim)]' : 'text-[var(--accent)]'
-                  }`}
-                >
-                  {perShare(m.value, ccy)}
-                </div>
-                <div className="text-[10px] text-[var(--text-faint)]">{m.label}</div>
-              </div>
+                {perShare(r.value, ccy)}
+              </span>
+              <span className="nums w-20 shrink-0 text-right text-xs text-[var(--text-faint)]">
+                {isMarket
+                  ? ''
+                  : signedPct(v.fundamentals.price > 0 ? r.value / v.fundamentals.price - 1 : 0)}
+              </span>
             </div>
           );
         })}
       </div>
-    </div>
+
+      <p className="mt-5 border-t border-[var(--border)] pt-4 text-xs text-[var(--text-faint)]">
+        Both methods discount the same forecast; they differ only in how they value the years beyond
+        it. The percentages are against today&apos;s price.
+      </p>
+    </section>
   );
 }

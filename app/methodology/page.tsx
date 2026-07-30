@@ -4,14 +4,14 @@ export const metadata = { title: 'Methodology - DCF Studio' };
 
 export default function Methodology() {
   return (
-    <main className="mx-auto max-w-3xl space-y-9 px-6 py-12">
+    <main className="mx-auto max-w-3xl space-y-10 px-6 py-16">
       <Link href="/" className="text-sm text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline">
         Back to search
       </Link>
-      <h1 className="text-3xl font-semibold tracking-tight text-white">Methodology</h1>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Methodology</h1>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">The cashflow build</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">The cashflow build</h2>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Free cashflow to firm is built from drivers rather than taken from a reported total, so
           every line is traceable:
@@ -28,7 +28,7 @@ FCFF(t)    = NOPAT(t) + D&A(t) - Capex(t) - change in NWC(t)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">Discount rate</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">Discount rate</h2>
         <pre className="nums overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">{`Cost of equity = risk-free + beta x equity risk premium
 Cost of debt   = interest expense / average total debt
 WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
@@ -49,7 +49,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">Terminal value</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">Terminal value</h2>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Both methods are shown, because terminal value is usually most of the answer and the gap
           between the two is the honest measure of how much rests on assumption. Gordon growth
@@ -70,7 +70,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">Scenario presets</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">Scenario presets</h2>
         <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>
             <strong>Base</strong> - revenue CAGR, mean EBIT margin, mean capex and D&amp;A as a share
@@ -93,7 +93,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">What the market must be assuming</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">Priced in</h2>
         <p className="leading-relaxed text-[var(--text-dim)]">
           A model that disagrees with the price by 60% is not very useful on its own. So each input is
           also solved in reverse: what would revenue growth, or margin, or the discount rate have to
@@ -106,7 +106,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">Where this breaks</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">Where this breaks</h2>
         <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>
             <strong>Banks and insurers.</strong> They report no meaningful operating income, and
@@ -137,7 +137,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-semibold text-white">Data sources</h2>
+        <h2 className="pt-2 text-xl font-semibold text-white">Data sources</h2>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Statements, prices, betas, analyst estimates and FX from Yahoo Finance. Australian
           risk-free rates from the Reserve Bank of Australia (F2, capital market yields). Both are

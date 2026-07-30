@@ -2,7 +2,15 @@ import { FcffChart } from './FcffChart';
 import { cagr, money, signedPct } from '@/lib/format';
 import type { DcfResult, ForecastYear } from '@/lib/types';
 
-export function ForecastTable({ dcf, currency }: { dcf: DcfResult; currency: string }) {
+export function ForecastTable({
+  dcf,
+  currency,
+  yearLabels,
+}: {
+  dcf: DcfResult;
+  currency: string;
+  yearLabels: string[];
+}) {
   const rows: {
     label: string;
     pick: (y: ForecastYear) => number;
@@ -33,13 +41,13 @@ export function ForecastTable({ dcf, currency }: { dcf: DcfResult; currency: str
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-white">Forecast cashflows</h2>
+      <h2 className="text-lg font-semibold text-white">Forecast Cashflows</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
         In {currency}, the currency the accounts are reported in. Outflows carry a minus sign, so the
         column adds up the way it would on paper.
       </p>
 
-      <FcffChart forecast={dcf.forecast} currency={currency} />
+      <FcffChart forecast={dcf.forecast} currency={currency} yearLabels={yearLabels} />
 
       <div className="mt-5 overflow-x-auto rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
@@ -53,11 +61,11 @@ export function ForecastTable({ dcf, currency }: { dcf: DcfResult; currency: str
                   key={y.year}
                   className="px-3 py-2.5 text-right text-xs font-medium tracking-wide text-[var(--text-faint)] uppercase"
                 >
-                  Year {y.year}
+                  {yearLabels[y.year - 1] ?? `Year ${y.year}`}
                 </th>
               ))}
               <th
-                title={`Compound annual growth from year 1 to year ${dcf.forecast.length}`}
+                title={`Compound annual growth from ${yearLabels[0]} to ${yearLabels[yearLabels.length - 1]}`}
                 className="border-l border-[var(--border-strong)] px-3 py-2.5 text-right text-xs font-medium tracking-wide text-[var(--text-faint)] uppercase"
               >
                 CAGR
@@ -112,7 +120,7 @@ export function ForecastTable({ dcf, currency }: { dcf: DcfResult; currency: str
           <tfoot>
             <tr className="border-t border-[var(--border-strong)] bg-[var(--surface-raised)]">
               <td className="px-4 py-3 font-medium text-[var(--text)]">
-                Present value of the forecast
+                Present Value Of The Forecast
               </td>
               <td
                 colSpan={dcf.forecast.length + 1}

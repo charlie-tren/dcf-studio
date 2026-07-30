@@ -30,7 +30,19 @@ const DA_CHAIN = [
   'reconciledDepreciation',
   'depreciationAndAmortizationInIncomeStatement',
 ];
-const CASH_CHAIN = ['cashAndCashEquivalents', 'cashCashEquivalentsAndShortTermInvestments'];
+/**
+ * Broadest measure FIRST. Net debt should net off everything the company could
+ * realistically use to repay debt, which includes marketable securities.
+ *
+ * Taking cashAndCashEquivalents first understated Alphabet's cash by USD 96.1bn
+ * - it holds 30.7bn of cash against 96.1bn of short-term investments - and
+ * therefore overstated net debt by the same, costing roughly USD 8 a share.
+ * The same applies to any cash-rich balance sheet.
+ */
+const CASH_CHAIN = [
+  'cashCashEquivalentsAndShortTermInvestments',
+  'cashAndCashEquivalents',
+];
 const SHARES_CHAIN = ['dilutedAverageShares', 'ordinarySharesNumber', 'shareIssued'];
 
 const FINANCIAL_SECTORS = ['Financial Services', 'Financial'];

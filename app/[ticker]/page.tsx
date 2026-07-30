@@ -97,7 +97,11 @@ export default async function ModelPage({ params, searchParams }: Props) {
         />
       </Suspense>
 
-      <ForecastTable dcf={valuation.dcf} currency={reportingCurrency} />
+      <ForecastTable
+        dcf={valuation.dcf}
+        currency={reportingCurrency}
+        yearLabels={valuation.forecastYearLabels}
+      />
       <WaccTable w={valuation.wacc} currency={reportingCurrency} />
       <TerminalComparison v={valuation} />
       <SensitivityTable
@@ -108,9 +112,7 @@ export default async function ModelPage({ params, searchParams }: Props) {
       <ImpliedPanel implied={valuation.implied} assumptions={valuation.assumptions} />
 
       <p className="border-t border-[var(--border)] pt-6 text-sm leading-relaxed text-[var(--text-faint)]">
-        A DCF tells you what a set of assumptions is worth, not what a share is worth. Change the
-        assumptions and the answer changes - that is the point of showing them. Figures come from
-        Yahoo Finance and the RBA and can be wrong or out of date.{' '}
+        Assumptions in, valuation out. Data from Yahoo Finance and the RBA.{' '}
         <Link
           href="/methodology"
           className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"

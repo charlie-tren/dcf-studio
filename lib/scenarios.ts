@@ -108,7 +108,12 @@ function consensusGrowthPath(
 
   const path: number[] = [];
   let previous = d.latestRevenue;
-  const estimates = [...f.analystRevenue].sort((a, b) => a.period.localeCompare(b.period));
+  // Sort by the NUMBER of years out, not the label. '+1y'.localeCompare('0y')
+  // puts +1y first because '+' sorts before '0', which fed next year's revenue
+  // in as year one - a 50% jump followed by a fall, and a consensus case that
+  // came out LOWER than base for a company analysts are bullish on.
+  const yearsOut = (period: string) => Number(period.replace(/[^0-9.-]/g, '')) || 0;
+  const estimates = [...f.analystRevenue].sort((a, b) => yearsOut(a.period) - yearsOut(b.period));
 
   for (let i = 0; i < horizon; i++) {
     if (i < estimates.length && previous > 0) {

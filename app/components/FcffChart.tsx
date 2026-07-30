@@ -5,7 +5,15 @@ import type { ForecastYear } from '@/lib/types';
  * time is visible rather than implied. Hand-rolled SVG: no chart library, no
  * client JS, and it renders identically server-side.
  */
-export function FcffChart({ forecast, currency }: { forecast: ForecastYear[]; currency: string }) {
+export function FcffChart({
+  forecast,
+  currency,
+  yearLabels,
+}: {
+  forecast: ForecastYear[];
+  currency: string;
+  yearLabels: string[];
+}) {
   const W = 680;
   const H = 200;
   const PAD = { top: 16, right: 12, bottom: 28, left: 56 };
@@ -86,7 +94,7 @@ export function FcffChart({ forecast, currency }: { forecast: ForecastYear[]; cu
                 fill="var(--text-faint)"
                 fontSize="10"
               >
-                Y{y.year}
+                {yearLabels[y.year - 1] ?? `Y${y.year}`}
               </text>
             </g>
           );

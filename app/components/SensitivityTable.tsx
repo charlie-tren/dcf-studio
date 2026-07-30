@@ -39,31 +39,37 @@ export function SensitivityTable({
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-white">How much the answer moves</h2>
+      <h2 className="text-lg font-semibold text-white">Sensitivity</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        Value per share in {currency} at different discount rates and long-run growth rates - the two
-        assumptions that swing a DCF hardest. Green beats today&apos;s price, red falls short. Growth
-        cannot exceed the discount rate, so those cells are blank.
+        Value per share in {currency} across the two assumptions that swing a DCF hardest. Green
+        beats today&apos;s price, red falls short.
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--border)]">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-[var(--surface-raised)]">
-              <th className="sticky left-0 z-10 bg-[var(--surface-raised)] px-4 py-3 text-left text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
+            <tr>
+              <th
+                colSpan={grid.growthValues.length + 1}
+                className="border-b border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2.5 text-center text-[10px] font-medium tracking-[0.14em] text-[var(--text-faint)] uppercase"
+              >
+                Long-run growth
+              </th>
+            </tr>
+            <tr className="bg-[var(--surface)]">
+              <th className="border-r border-[var(--border)] px-5 py-3 text-left text-[10px] font-medium tracking-[0.14em] text-[var(--text-faint)] uppercase">
                 Discount rate
               </th>
               {grid.growthValues.map((g, j) => (
                 <th
                   key={g}
-                  className={`nums px-4 py-3 text-right text-xs font-medium whitespace-nowrap ${
+                  className={`nums px-5 py-3 text-right text-xs whitespace-nowrap ${
                     j === grid.centre.growthIndex
-                      ? 'text-[var(--text)]'
-                      : 'text-[var(--text-faint)]'
+                      ? 'font-semibold text-[var(--text)]'
+                      : 'font-medium text-[var(--text-faint)]'
                   }`}
                 >
                   {pct(g, 2)}
-                  <span className="ml-1 text-[10px] text-[var(--text-faint)]">growth</span>
                 </th>
               ))}
             </tr>
@@ -74,10 +80,10 @@ export function SensitivityTable({
               return (
                 <tr key={w} className="border-t border-[var(--border)]">
                   <th
-                    className={`nums sticky left-0 z-10 px-4 py-3 text-left text-xs font-medium whitespace-nowrap ${
+                    className={`nums border-r border-[var(--border)] px-5 py-3.5 text-left text-xs whitespace-nowrap ${
                       isCentreRow
-                        ? 'bg-[var(--surface-raised)] text-[var(--text)]'
-                        : 'bg-[var(--surface)] text-[var(--text-faint)]'
+                        ? 'bg-[var(--surface-raised)] font-semibold text-[var(--text)]'
+                        : 'bg-[var(--surface)] font-medium text-[var(--text-faint)]'
                     }`}
                   >
                     {pct(w, 2)}
@@ -88,9 +94,9 @@ export function SensitivityTable({
                       <td
                         key={j}
                         style={cellStyle(cell)}
-                        className={`nums px-4 py-3 text-right whitespace-nowrap ${
+                        className={`nums px-5 py-3.5 text-right whitespace-nowrap ${
                           isCentre
-                            ? 'font-semibold text-white outline-1 -outline-offset-1 outline-[var(--accent)]'
+                            ? 'font-semibold text-white outline-2 -outline-offset-2 outline-[var(--accent)]'
                             : 'text-[var(--text-dim)]'
                         }`}
                       >
@@ -104,9 +110,10 @@ export function SensitivityTable({
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-[var(--text-faint)]">
-        Outlined: the model as it stands, at {pct(grid.waccValues[grid.centre.waccIndex], 2)} and{' '}
-        {pct(grid.growthValues[grid.centre.growthIndex], 2)} growth.
+      <p className="mt-2.5 text-xs text-[var(--text-faint)]">
+        Outlined cell: this model, at {pct(grid.waccValues[grid.centre.waccIndex], 2)} and{' '}
+        {pct(grid.growthValues[grid.centre.growthIndex], 2)} growth. A dash means growth met the
+        discount rate, where a perpetuity stops converging.
       </p>
     </section>
   );

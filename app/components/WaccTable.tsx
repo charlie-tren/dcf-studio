@@ -36,7 +36,7 @@ export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string 
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-white">Discount rate</h2>
+      <h2 className="text-lg font-semibold text-white">Discount Rate</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
         Every component is shown with where it came from, and every one can be overridden above.
       </p>

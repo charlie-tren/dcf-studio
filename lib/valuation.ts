@@ -41,6 +41,12 @@ const LIVE_DEPS: ValuationDeps = {
 };
 
 export type Valuation = {
+  /**
+   * Calendar labels for each forecast year, e.g. ['FY26', ..., 'FY30'].
+   * Derived from the latest reported period end rather than the clock, so a
+   * shared link always shows the same years the model was built on.
+   */
+  forecastYearLabels: string[];
   fundamentals: Fundamentals;
   assumptions: Assumptions;
   wacc: WaccBreakdown;
@@ -173,7 +179,17 @@ export async function buildValuation(
     });
   }
 
+  // Label forecast years off the last reported fiscal year end. A June
+  // year-end (BHP, ARB) is labelled by the year it ends in, matching how the
+  // company reports it.
+  const baseFiscalYear = Number(latest.periodEnd.slice(0, 4));
+  const forecastYearLabels = Array.from(
+    { length: assumptions.horizonYears },
+    (_, i) => `FY${String((baseFiscalYear + i + 1) % 100).padStart(2, '0')}`
+  );
+
   return {
+    forecastYearLabels,
     fundamentals,
     assumptions,
     wacc,

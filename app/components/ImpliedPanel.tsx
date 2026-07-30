@@ -28,11 +28,10 @@ export function ImpliedPanel({
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-white">What the market must be assuming</h2>
+      <h2 className="text-lg font-semibold text-white">Priced In</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-        Each line solves for the single input that would make today&apos;s price the right answer,
-        holding everything else at this model&apos;s values. They are alternatives, not a set - any one
-        of them on its own closes the gap.
+        What each input would need to be for today&apos;s price to hold, with everything else left
+        where it is. Any one on its own closes the gap.
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--border)]">
