@@ -86,6 +86,15 @@ the type system rather than in a footnote.
 - **Capex**: `capitalExpenditure` (sign-normalised to positive outflow)
 - **ΔNWC**: `changeInWorkingCapital` → balance-sheet delta
   (Δreceivables + Δinventory − Δpayables) → % of Δrevenue, flagged as modelled
+
+  **Canonical sign convention: an increase in net working capital is positive and is a
+  cash outflow.** This matters more than it looks. Yahoo's `changeInWorkingCapital` is a
+  *cashflow contribution* (MSFT returns −5,350 in a year revenue grew), whereas the
+  balance-sheet fallback computes the accounting change - the two have opposite signs.
+  Feeding either into `− ΔNWC` without normalising gives a plausible-looking answer that
+  is wrong by twice the working-capital movement. The normaliser flips the Yahoo
+  cashflow field to the canonical convention, and a test asserts both paths agree in
+  sign for MSFT and BHP.AX, where both source fields are available.
 - **Net debt**: `totalDebt − cashAndCashEquivalents`
 - **Shares**: `ordinarySharesNumber` → `shareIssued`, diluted where available
 - **Effective tax rate**: median of `taxProvision / pretaxIncome` across available
@@ -122,6 +131,11 @@ Re = rf + β × ERP. Every component is a visible line and every one is overrida
 - **Weights:** market capitalisation vs total debt (book value as a proxy for market
   value of debt - stated as such).
 - **Tax shield:** at the effective tax rate, capped at statutory.
+
+```
+WACC = (E/V) × Re + (D/V) × Rd × (1 − t)
+       where E = market capitalisation, D = total debt, V = E + D
+```
 
 ## 8. Sector guard
 
@@ -178,6 +192,15 @@ FCFF(t)      = NOPAT(t) + D&A(t) − Capex(t) − ΔNWC(t)
   converted to quote currency
 - **Loss-makers:** negative FCFF is not suppressed. Terminal value's share of total
   value is called out, since for a loss-maker that share is effectively the whole answer.
+- **Capex sustainability guard.** Projecting capex as a percentage of revenue breaks
+  where reported capex understates real investment. The probe found both cases:
+  Stockland's capex is A$3m on A$3.1bn of revenue (0.1% - a REIT invests through a
+  different line), and ARB reports both `capitalExpenditure` of A$53m and
+  `Capital Expenditure Reported` of A$3.8m. Left alone, Stockland gets roughly zero
+  capex in perpetuity and its valuation inflates. Where capex/revenue sits materially
+  below D&A/revenue, flag it - a business cannot sustain depreciation above investment
+  indefinitely - and default capex to D&A with the substitution shown. Same class of
+  guard as the beta clamp.
 
 ## 11. Output
 
@@ -211,7 +234,7 @@ database, stays inside Vercel's free tier.
 | Beta absurd or absent | Clamp or default, show raw value |
 | Risk-free unavailable | Fall back to the market default table, labelled as assumed |
 | `g ≥ WACC` | Block the Gordon calculation with an explanation; exit multiple still shown |
-| Yahoo unreachable or rate-limited | Serve stale cache with its age shown; explain if nothing cached |
+| Yahoo unreachable or rate-limited | Serve stale cache with its age shown; explain plainly if nothing is cached. **Verify first:** Vercel's `revalidate` serves stale while revalidating in the background, but a failed upstream fetch against a cold cache has nothing to serve. Confirm the behaviour on a 429 during implementation and, if needed, keep an explicit last-good snapshot per ticker rather than relying on the framework cache. |
 
 Name→ticker resolution ranks by exchange preference (ASX and US first, then the tier-1
 list), because the probe showed "Woolworths" returns Frankfurt and Johannesburg lines
