@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { toQuoteDisplayUnits, priceInMajorUnits, majorCurrency } from '@/lib/fx';
+import {
+  toQuoteDisplayUnits,
+  priceInMajorUnits,
+  majorCurrency,
+  priceInReportingCurrency,
+} from '@/lib/fx';
 
 describe('toQuoteDisplayUnits', () => {
   it('leaves a value alone when reporting and quote currency match', () => {
@@ -62,5 +67,30 @@ describe('round trip', () => {
     const displayed = toQuoteDisplayUnits(30, ctx).value;
     const backInMajor = priceInMajorUnits(displayed, ctx.quoteCurrency);
     expect(backInMajor / ctx.fxRate).toBeCloseTo(30, 8);
+  });
+
+  it('priceInReportingCurrency exactly inverts toQuoteDisplayUnits', () => {
+    const contexts = [
+      { reportingCurrency: 'AUD', quoteCurrency: 'AUD', fxRate: 1 },
+      { reportingCurrency: 'USD', quoteCurrency: 'AUD', fxRate: 1.4364 },
+      { reportingCurrency: 'USD', quoteCurrency: 'GBp', fxRate: 0.79 },
+      { reportingCurrency: 'GBP', quoteCurrency: 'GBp', fxRate: 1 },
+    ];
+    for (const ctx of contexts) {
+      const quoted = toQuoteDisplayUnits(42.5, ctx).value;
+      expect(priceInReportingCurrency(quoted, ctx), JSON.stringify(ctx)).toBeCloseTo(42.5, 8);
+    }
+  });
+
+  it('brings a pence price back to dollars for comparison against model output', () => {
+    // Shell: 3323.5p at USDGBP 0.79 is about USD 42 a share.
+    const back = priceInReportingCurrency(3323.5, {
+      reportingCurrency: 'USD',
+      quoteCurrency: 'GBp',
+      fxRate: 0.79,
+    });
+    expect(back).toBeCloseTo(33.235 / 0.79, 6);
+    expect(back).toBeGreaterThan(30);
+    expect(back).toBeLessThan(50);
   });
 });

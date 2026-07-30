@@ -42,3 +42,16 @@ export function priceInMajorUnits(price: number, quoteCurrency: string): number 
   const divisor = QUOTE_SUBUNIT_DIVISOR[quoteCurrency];
   return divisor ? price / divisor : price;
 }
+
+/**
+ * The exact inverse of toQuoteDisplayUnits: takes a quoted market price back
+ * into reporting currency. Needed wherever a quoted price is compared against
+ * figures the model produced in reporting currency - the sensitivity grid, for
+ * instance, whose cells are per-share values in reporting terms.
+ */
+export function priceInReportingCurrency(quotedPrice: number, ctx: FxContext): number {
+  const inMajorUnits = priceInMajorUnits(quotedPrice, ctx.quoteCurrency);
+  const sameCurrency = majorCurrency(ctx.quoteCurrency) === ctx.reportingCurrency;
+  if (sameCurrency || ctx.fxRate === 0) return inMajorUnits;
+  return inMajorUnits / ctx.fxRate;
+}
