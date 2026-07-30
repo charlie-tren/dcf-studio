@@ -42,16 +42,32 @@ function buildForecast(inputs: DcfInputs, a: Assumptions): ForecastYear[] {
   return years;
 }
 
+/** Year-end discounts at t, mid-year at t - 0.5. */
+function discountExponent(year: number, midYear: boolean): number {
+  return midYear ? year - 0.5 : year;
+}
+
+function discount(forecast: ForecastYear[], a: Assumptions): number {
+  let pvExplicit = 0;
+  for (const y of forecast) {
+    y.discountFactor = 1 / (1 + a.wacc) ** discountExponent(y.year, a.midYearConvention);
+    y.presentValue = y.fcff * y.discountFactor;
+    pvExplicit += y.presentValue;
+  }
+  return pvExplicit;
+}
+
 export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
   assertLength('revenueGrowth', a.revenueGrowth, a.horizonYears);
   assertLength('ebitMargin', a.ebitMargin, a.horizonYears);
 
   const forecast = buildForecast(inputs, a);
+  const pvExplicit = discount(forecast, a);
 
-  // Discounting, terminal value and the bridge arrive in the next tasks.
+  // Terminal value and the bridge arrive in the next task.
   return {
     forecast,
-    pvExplicit: 0,
+    pvExplicit,
     gordon: {
       terminal: { method: 'gordon', undiscounted: 0, presentValue: 0, shareOfEv: 0 },
       enterpriseValue: 0,

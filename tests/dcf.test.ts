@@ -60,3 +60,25 @@ describe('runDcf - FCFF build', () => {
     expect(() => runDcf(REF_INPUTS, bad)).toThrow(/revenueGrowth/);
   });
 });
+
+describe('runDcf - discounting', () => {
+  it('discounts year-end at full t', () => {
+    const r = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    expect(r.forecast[0].discountFactor).toBeCloseTo(1 / 1.1, 10);
+    expect(r.forecast[4].discountFactor).toBeCloseTo(1 / 1.1 ** 5, 10);
+  });
+
+  it('sums the present values of the explicit forecast', () => {
+    const r = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    // Independent recompute: FCFF growing at exactly the discount rate means
+    // every year has the same PV of 122/1.1, so the sum is 5 x that.
+    expect(r.pvExplicit).toBeCloseTo(5 * (122 / 1.1), 8);
+  });
+
+  it('discounts mid-year at t - 0.5, worth sqrt(1 + WACC) more', () => {
+    const end = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    const mid = runDcf(REF_INPUTS, { ...REF_ASSUMPTIONS, midYearConvention: true });
+    expect(mid.forecast[0].discountFactor).toBeCloseTo(1 / 1.1 ** 0.5, 10);
+    expect(mid.pvExplicit).toBeCloseTo(end.pvExplicit * Math.sqrt(1.1), 8);
+  });
+});
