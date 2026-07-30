@@ -54,11 +54,15 @@ npx --yes create-next-app@latest dcf-studio-scaffold --typescript --tailwind --a
 
 - [ ] **Step 2: Move the scaffold into the repo**
 
+Delete `node_modules` **before** copying. Copying thousands of small files into a
+OneDrive-adjacent path on Windows is slow, lock-prone, and can half-succeed.
+`npm install` in Step 3 recreates it in place.
+
 ```bash
-cd ~/dev && rm -rf dcf-studio-scaffold/.git && cp -r dcf-studio-scaffold/. dcf-studio/ && rm -rf dcf-studio-scaffold
+cd ~/dev && rm -rf dcf-studio-scaffold/.git dcf-studio-scaffold/node_modules && cp -r dcf-studio-scaffold/. dcf-studio/ && rm -rf dcf-studio-scaffold
 ```
 
-Windows note: if `node_modules` file locks cause failures, close any editor holding the folder. Do not blanket-kill `node.exe`.
+Windows note: if file locks still cause failures, close any editor holding the folder. Do not blanket-kill `node.exe`.
 
 - [ ] **Step 3: Install runtime and test dependencies**
 
@@ -90,9 +94,12 @@ export default defineConfig({
 Add to the `"scripts"` block:
 
 ```json
-"test": "vitest run",
+"test": "vitest run --passWithNoTests",
 "test:watch": "vitest"
 ```
+
+`--passWithNoTests` matters: without it the first run exits non-zero before any test
+exists, which reads as a broken toolchain.
 
 - [ ] **Step 6: Verify the toolchain runs**
 
@@ -100,7 +107,7 @@ Add to the `"scripts"` block:
 cd ~/dev/dcf-studio && npx tsc --noEmit && npm test
 ```
 
-Expected: `tsc` clean. `npm test` reports "No test files found" and exits non-zero - that is fine at this point, it proves vitest resolves.
+Expected: both exit 0. `npm test` reports no test files, which is correct at this point and proves vitest resolves.
 
 - [ ] **Step 7: Commit**
 
