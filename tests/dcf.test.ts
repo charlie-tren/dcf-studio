@@ -123,3 +123,37 @@ describe('runDcf - terminal value', () => {
     expect(g.terminal.shareOfEv).toBeGreaterThan(0.6);
   });
 });
+
+describe('runDcf - full reconciliation against an independent recompute', () => {
+  it('reconciles enterprise value, equity value and value per share', () => {
+    const r = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+
+    // Recomputed longhand, not by reusing the engine's loop.
+    const pvExplicit = 5 * (122 / 1.1);
+    const pvTerminal = ((178.6202 * 1.025) / 0.075) / 1.1 ** 5;
+    const ev = pvExplicit + pvTerminal;
+    const equity = ev - 500;
+
+    expect(r.pvExplicit).toBeCloseTo(pvExplicit, 6);
+    expect(r.gordon.enterpriseValue).toBeCloseTo(ev, 6);
+    expect(r.gordon.equityValue).toBeCloseTo(equity, 6);
+    expect(r.gordon.valuePerShare).toBeCloseTo(equity / 100, 8);
+  });
+
+  it('subtracts net debt, so a net cash company is worth more than its EV implies', () => {
+    const netCash = runDcf({ ...REF_INPUTS, netDebt: -200 }, REF_ASSUMPTIONS);
+    const netDebt = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    expect(netCash.gordon.equityValue - netDebt.gordon.equityValue).toBeCloseTo(700, 6);
+  });
+
+  it('flags negative free cashflow rather than hiding it', () => {
+    const lossMaker = runDcf(REF_INPUTS, { ...REF_ASSUMPTIONS, ebitMargin: Array(5).fill(-0.15) });
+    expect(lossMaker.forecast.every((y) => y.fcff < 0)).toBe(true);
+    expect(lossMaker.warnings.some((w) => /negative/i.test(w))).toBe(true);
+  });
+
+  it('returns zero per share rather than Infinity when the share count is missing', () => {
+    const r = runDcf({ ...REF_INPUTS, dilutedShares: 0 }, REF_ASSUMPTIONS);
+    expect(r.gordon.valuePerShare).toBe(0);
+  });
+});
