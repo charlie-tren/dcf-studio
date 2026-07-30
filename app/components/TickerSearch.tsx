@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Hit = { symbol: string; name: string; exchange: string };
 
@@ -10,22 +10,35 @@ export function TickerSearch() {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
+  const latest = useRef(0);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setHits([]);
-      return;
+    const term = query.trim();
+    if (term.length < 2) {
+      // Deferred so the effect body never calls setState synchronously, which
+      // triggers a cascading render.
+      const clear = setTimeout(() => {
+        setHits([]);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(clear);
     }
+
+    const request = ++latest.current;
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
         const data = await res.json();
-        setHits(data.hits ?? []);
+        // Ignore a slow response that a newer keystroke has already superseded.
+        if (request === latest.current) setHits(data.hits ?? []);
+      } catch {
+        if (request === latest.current) setHits([]);
       } finally {
-        setLoading(false);
+        if (request === latest.current) setLoading(false);
       }
     }, 250);
+
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -40,6 +53,9 @@ export function TickerSearch() {
         aria-label="Company name or ticker"
       />
       {loading && <p className="mt-2 text-sm text-neutral-500">Searching...</p>}
+      {!loading && query.trim().length >= 2 && hits.length === 0 && (
+        <p className="mt-2 text-sm text-neutral-500">No matches. Try a ticker, or a fuller name.</p>
+      )}
       <ul className="mt-2 divide-y divide-neutral-200">
         {hits.map((hit) => (
           <li key={hit.symbol}>

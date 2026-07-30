@@ -68,7 +68,10 @@ export async function fetchTicker(ticker: string): Promise<RawTicker> {
 export type SearchHit = { symbol: string; name: string; exchange: string };
 
 export async function searchTickers(query: string): Promise<SearchHit[]> {
-  const res = await yf.search(query);
+  // The default of 5 quotes is not enough: a search for "woolworths" spends all
+  // five on Frankfurt, Hamburg, Johannesburg and Chi-X lines and never returns
+  // WOW.AX at all. Ask for more so the primary listing is in the set to rank.
+  const res = await yf.search(query, { quotesCount: 25, newsCount: 0 });
   return (res.quotes ?? [])
     .filter((q) => {
       const r = q as Record<string, unknown>;

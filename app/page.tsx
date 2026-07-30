@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Suspense } from 'react';
 import { TickerSearch } from './components/TickerSearch';
 
@@ -17,9 +18,9 @@ export default function Home() {
       <p className="mt-12 text-sm text-neutral-500">
         General information only, not financial advice. Data from Yahoo Finance and the Reserve Bank
         of Australia; figures may be stale or wrong. Not affiliated with Yahoo.{' '}
-        <a href="/methodology" className="underline">
+        <Link href="/methodology" className="underline">
           How it works
-        </a>
+        </Link>
         .
       </p>
     </main>
