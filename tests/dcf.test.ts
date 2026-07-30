@@ -82,3 +82,44 @@ describe('runDcf - discounting', () => {
     expect(mid.pvExplicit).toBeCloseTo(end.pvExplicit * Math.sqrt(1.1), 8);
   });
 });
+
+describe('runDcf - terminal value', () => {
+  it('computes Gordon growth off the final year FCFF', () => {
+    const r = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    const expected = (178.6202 * 1.025) / (0.10 - 0.025);
+    expect(r.gordon.terminal.undiscounted).toBeCloseTo(expected, 4);
+    expect(r.gordon.terminal.presentValue).toBeCloseTo(expected / 1.1 ** 5, 4);
+  });
+
+  it('computes the exit multiple off terminal EBITDA', () => {
+    const r = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    // Terminal EBITDA = EBIT + D&A = 1610.51*0.20 + 1610.51*0.05 = 402.6275
+    const expected = 1610.51 * 0.25 * 8;
+    expect(r.exitMultiple.terminal.undiscounted).toBeCloseTo(expected, 4);
+    expect(r.exitMultiple.terminal.presentValue).toBeCloseTo(expected / 1.1 ** 5, 4);
+  });
+
+  it('discounts the terminal value at full t even under the mid-year convention', () => {
+    // Terminal value sits at the end of year n by construction, so it is not
+    // shifted half a year. Only the explicit cashflows are.
+    const mid = runDcf(REF_INPUTS, { ...REF_ASSUMPTIONS, midYearConvention: true });
+    const expected = (178.6202 * 1.025) / 0.075;
+    expect(mid.gordon.terminal.presentValue).toBeCloseTo(expected / 1.1 ** 5, 4);
+  });
+
+  it('blocks Gordon growth when terminal growth meets or exceeds WACC', () => {
+    const r = runDcf(REF_INPUTS, { ...REF_ASSUMPTIONS, terminalGrowth: 0.10 });
+    expect(r.gordon.terminal.blocked).toMatch(/terminal growth/i);
+    expect(r.gordon.terminal.presentValue).toBe(0);
+    expect(r.warnings.some((w) => /terminal growth/i.test(w))).toBe(true);
+    // The exit multiple is unaffected and still produces a value.
+    expect(r.exitMultiple.terminal.presentValue).toBeGreaterThan(0);
+  });
+
+  it('reports each method terminal share of enterprise value', () => {
+    const r = runDcf(REF_INPUTS, REF_ASSUMPTIONS);
+    const g = r.gordon;
+    expect(g.terminal.shareOfEv).toBeCloseTo(g.terminal.presentValue / g.enterpriseValue, 10);
+    expect(g.terminal.shareOfEv).toBeGreaterThan(0.6);
+  });
+});

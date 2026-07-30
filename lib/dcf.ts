@@ -1,4 +1,4 @@
-import type { Assumptions, DcfInputs, DcfResult, ForecastYear } from './types';
+import type { Assumptions, DcfInputs, DcfResult, ForecastYear, TerminalValue, ValuationByMethod } from './types';
 
 function assertLength(name: string, arr: number[], expected: number): void {
   if (arr.length !== expected) {
@@ -57,6 +57,56 @@ function discount(forecast: ForecastYear[], a: Assumptions): number {
   return pvExplicit;
 }
 
+function terminalDiscountFactor(a: Assumptions): number {
+  // Terminal value sits at the end of the final explicit year, so it always
+  // discounts at full t, regardless of the convention used for the flows.
+  return 1 / (1 + a.wacc) ** a.horizonYears;
+}
+
+function gordonTerminal(finalFcff: number, a: Assumptions): TerminalValue {
+  if (a.terminalGrowth >= a.wacc) {
+    return {
+      method: 'gordon',
+      undiscounted: 0,
+      presentValue: 0,
+      shareOfEv: 0,
+      blocked: `Terminal growth of ${(a.terminalGrowth * 100).toFixed(2)}% must be below the WACC of ${(a.wacc * 100).toFixed(2)}% for a perpetuity to converge.`,
+    };
+  }
+  const undiscounted = (finalFcff * (1 + a.terminalGrowth)) / (a.wacc - a.terminalGrowth);
+  return {
+    method: 'gordon',
+    undiscounted,
+    presentValue: undiscounted * terminalDiscountFactor(a),
+    shareOfEv: 0,
+  };
+}
+
+function exitMultipleTerminal(finalYear: ForecastYear, a: Assumptions): TerminalValue {
+  const terminalEbitda = finalYear.ebit + finalYear.dAndA;
+  const undiscounted = terminalEbitda * a.exitMultiple;
+  return {
+    method: 'exitMultiple',
+    undiscounted,
+    presentValue: undiscounted * terminalDiscountFactor(a),
+    shareOfEv: 0,
+  };
+}
+
+function bridge(pvExplicit: number, terminal: TerminalValue, inputs: DcfInputs): ValuationByMethod {
+  const enterpriseValue = pvExplicit + terminal.presentValue;
+  const equityValue = enterpriseValue - inputs.netDebt;
+  return {
+    terminal: {
+      ...terminal,
+      shareOfEv: enterpriseValue === 0 ? 0 : terminal.presentValue / enterpriseValue,
+    },
+    enterpriseValue,
+    equityValue,
+    valuePerShare: inputs.dilutedShares === 0 ? 0 : equityValue / inputs.dilutedShares,
+  };
+}
+
 export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
   assertLength('revenueGrowth', a.revenueGrowth, a.horizonYears);
   assertLength('ebitMargin', a.ebitMargin, a.horizonYears);
@@ -64,22 +114,21 @@ export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
   const forecast = buildForecast(inputs, a);
   const pvExplicit = discount(forecast, a);
 
-  // Terminal value and the bridge arrive in the next task.
+  const finalYear = forecast[forecast.length - 1];
+  const gordonTv = gordonTerminal(finalYear.fcff, a);
+  const exitTv = exitMultipleTerminal(finalYear, a);
+
+  const warnings: string[] = [];
+  if (gordonTv.blocked) warnings.push(gordonTv.blocked);
+  if (forecast.some((y) => y.fcff < 0)) {
+    warnings.push('Free cashflow to firm is negative in at least one forecast year, so terminal value carries most of the valuation.');
+  }
+
   return {
     forecast,
     pvExplicit,
-    gordon: {
-      terminal: { method: 'gordon', undiscounted: 0, presentValue: 0, shareOfEv: 0 },
-      enterpriseValue: 0,
-      equityValue: 0,
-      valuePerShare: 0,
-    },
-    exitMultiple: {
-      terminal: { method: 'exitMultiple', undiscounted: 0, presentValue: 0, shareOfEv: 0 },
-      enterpriseValue: 0,
-      equityValue: 0,
-      valuePerShare: 0,
-    },
-    warnings: [],
+    gordon: bridge(pvExplicit, gordonTv, inputs),
+    exitMultiple: bridge(pvExplicit, exitTv, inputs),
+    warnings,
   };
 }
