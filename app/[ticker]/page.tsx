@@ -16,6 +16,15 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+export async function generateMetadata({ params }: Props) {
+  const { ticker } = await params;
+  const symbol = decodeURIComponent(ticker).toUpperCase();
+  return {
+    title: `${symbol} - DCF Studio`,
+    description: `Discounted cashflow valuation of ${symbol}, with every assumption and intermediate line visible.`,
+  };
+}
+
 export default async function ModelPage({ params, searchParams }: Props) {
   const { ticker } = await params;
   const raw = await searchParams;

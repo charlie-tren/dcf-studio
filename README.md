@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DCF Studio
 
-## Getting Started
+Type a company. Get a discounted cashflow valuation built from its own reported numbers,
+with every assumption on the surface and every line traceable back to the field it came
+from.
 
-First, run the development server:
+## Running locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tests
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The data-layer tests run against recorded Yahoo responses in `tests/fixtures/`, so they
+never hit the network. Each fixture was chosen because it breaks something: CBA and RY
+report no operating income, SHEL quotes pence while reporting dollars, ARB and SGP report
+no working-capital movement, SGP's capex is 0.1% of revenue, MSB is loss-making and
+returns a negative beta.
 
-## Learn More
+Re-record them deliberately, never casually - the gaps they capture are the regression
+tests:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx tsx scripts/record-fixtures.ts
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Diagnostics
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Green unit tests missed five real bugs during the build; each was caught by reading actual
+output. Run these after any change to the data layer:
 
-## Deploy on Vercel
+```bash
+npx tsx scripts/inspect-normalised.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx tsx scripts/inspect-valuations.ts
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx tsx scripts/check-rba-live.ts
+```
+
+## Design and plan
+
+- `docs/superpowers/specs/2026-07-30-dcf-studio-design.md`
+- `docs/superpowers/plans/2026-07-30-dcf-studio.md`
+- `docs/TODO.md`
+
+## Data sources
+
+Yahoo Finance (statements, prices, betas, analyst estimates, FX) and the Reserve Bank of
+Australia (F2 capital market yields, the 10-year Australian Government series). Both free.
+
+General information only, not financial advice. Not affiliated with Yahoo.
