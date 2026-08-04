@@ -2,10 +2,10 @@
 
 ## Next up
 
-- [ ] **Add DCF Studio to the personal website** - link card on `charlie-tren.github.io`
-  pointing at https://dcf-studio.vercel.app, alongside Crowdwise / One Story / The
-  Aftertimes. Separate repo (`charlie-tren/charlie-tren.github.io`); needs a screenshot
-  thumbnail to match the existing cards. Requested 30/07/2026.
+- [x] **Add DCF Studio to the personal website** - DONE 30/07/2026 by Charlie himself
+  (commit 6506f39 in the hub repo, verified live on charlie-tren.github.io linking to
+  dcf-studio.vercel.app with a dcf-studio.png thumbnail). This item was stale - written
+  before the work was done and never re-checked.
 - [ ] **Bare "woolworths" search does not surface WOW.AX.** Yahoo caps `search` at 5 quotes
   regardless of `quotesCount`, and for that term all five are the South African Woolworths
   Holdings plus cross-listings. "woolworths group" ranks WOW.AX first. Options: a
