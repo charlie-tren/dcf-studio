@@ -36,7 +36,7 @@ export default function RootLayout({
           <div className="mx-auto max-w-5xl px-6 py-6 text-xs text-[var(--text-faint)]">
             Built by{' '}
             <a
-              href="https://charlie-tren.github.io/"
+              href="https://charlietrenorden.com/"
               target="_blank"
               rel="noopener noreferrer"
               className="underline decoration-dotted underline-offset-2 hover:text-[var(--text-dim)]"

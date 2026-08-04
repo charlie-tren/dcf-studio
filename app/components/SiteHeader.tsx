@@ -18,7 +18,7 @@ export function SiteHeader() {
             Methodology
           </Link>
           <a
-            href="https://charlie-tren.github.io/"
+            href="https://charlietrenorden.com/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
