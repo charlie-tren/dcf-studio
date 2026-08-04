@@ -124,6 +124,25 @@ export type TerminalValue = {
   shareOfEv: number;
   /** Set when the method could not be computed; presentValue is 0 in that case. */
   blocked?: string;
+  /**
+   * How the capitalised cashflow was arrived at. The steady-state adjustment
+   * swings terminal value by 9-33%, so it has to be on the page rather than
+   * buried in the engine - an invisible assumption that large defeats the point
+   * of showing the workings. Only set for the Gordon method.
+   */
+  steadyState?: {
+    /** Final explicit year FCFF, before any normalisation. */
+    forecastFcff: number;
+    /** After capex is reset to depreciation. */
+    maintenanceFcff: number;
+    /** g / ROIC of NOPAT, the cash growth requires. */
+    reinvestment: number;
+    /** What the perpetuity actually capitalises. */
+    capitalisedFcff: number;
+    roic: number;
+    roicFromAccounts: boolean;
+    reinvestmentRate: number;
+  };
 };
 
 export type ValuationByMethod = {

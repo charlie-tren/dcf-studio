@@ -20,7 +20,32 @@ export const TILTS = {
 } as const;
 
 const DEFAULT_TERMINAL_GROWTH = 0.025;
+/**
+ * Fallback only. A fixed multiple applied to every company is not a second
+ * opinion, it is an arbitrary anchor shown with equal weight to the DCF - 8x was
+ * being used for Microsoft, Shell and a property trust alike. Where the company
+ * has a current EV/EBITDA it is used instead, clamped to a defensible band.
+ */
 const DEFAULT_EXIT_MULTIPLE = 8;
+const EXIT_MULTIPLE_BAND = { min: 3, max: 20 };
+
+/**
+ * The company's own current EV/EBITDA, as the starting point for the exit
+ * multiple. Clamped because a depressed or blown-out trailing multiple should
+ * not be projected five years out unchallenged, and a negative EBITDA gives no
+ * usable figure at all.
+ */
+function currentEvEbitda(f: Fundamentals): { multiple: number; raw: number; clamped: boolean } | null {
+  const latest = f.years[0];
+  const ebitda = latest.ebit.value + latest.dAndA.value;
+  if (ebitda <= 0 || f.marketCap <= 0) return null;
+  const enterpriseValue = f.marketCap + latest.totalDebt.value - latest.cash.value;
+  if (enterpriseValue <= 0) return null;
+  const raw = enterpriseValue / ebitda;
+  if (!Number.isFinite(raw)) return null;
+  const multiple = clamp(raw, EXIT_MULTIPLE_BAND.min, EXIT_MULTIPLE_BAND.max);
+  return { multiple, raw, clamped: multiple !== raw };
+}
 /**
  * Two independent ways reported capex fails to represent real investment.
  *
@@ -163,6 +188,21 @@ export function buildScenario(
   const flags: DataQualityFlag[] = [];
   const notes: string[] = [];
 
+  // The clamp binds on exactly the cases it exists for - a bank whose EBITDA is
+  // meaningless (CBA 28.8x, RBC 30.0x) or a REIT whose negligible depreciation
+  // makes EBITDA nearly EBIT (Stockland 20.0x). Say so rather than presenting a
+  // clamped figure as the company's own rating.
+  const evEbitda = currentEvEbitda(f);
+  if (evEbitda?.clamped) {
+    notes.push(
+      `Current EV/EBITDA of ${evEbitda.raw.toFixed(1)}x sits outside a defensible ${EXIT_MULTIPLE_BAND.min}-${EXIT_MULTIPLE_BAND.max}x band, so the exit multiple is capped at ${evEbitda.multiple.toFixed(1)}x. A multiple that far out usually means EBITDA is the wrong denominator for this business.`
+    );
+  } else if (!evEbitda) {
+    notes.push(
+      `No usable EV/EBITDA (EBITDA is not positive), so the exit multiple falls back to ${DEFAULT_EXIT_MULTIPLE}x.`
+    );
+  }
+
   let capexPctRevenue = drivers.capexPctRevenue;
   const belowDepreciation =
     drivers.daPctRevenue > 0 && capexPctRevenue < drivers.daPctRevenue * CAPEX_TO_DA_FLOOR;
@@ -210,7 +250,7 @@ export function buildScenario(
       capexPctRevenue,
       nwcPctRevenueChange: drivers.nwcPctRevenueChange,
       terminalGrowth: DEFAULT_TERMINAL_GROWTH + terminalTilt,
-      exitMultiple: DEFAULT_EXIT_MULTIPLE,
+      exitMultiple: evEbitda?.multiple ?? DEFAULT_EXIT_MULTIPLE,
       wacc,
       midYearConvention: true,
       terminalCapexEqualsDA: true,

@@ -219,6 +219,45 @@ describe('runDcf - terminal capex normalisation', () => {
     expect(on.warnings.some((w) => /steady state/i.test(w))).toBe(false);
   });
 
+  it('exposes a steady-state bridge that reconciles to the terminal value', () => {
+    // The adjustment swings TV by 9-33%, so it is rendered on the page. A
+    // displayed bridge that does not tie to the number above it is worse than
+    // no bridge, so assert every step reconciles.
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.20 });
+    const ss = r.gordon.terminal.steadyState;
+    expect(ss).toBeDefined();
+    if (!ss) return;
+    const final = r.forecast[4];
+
+    expect(ss.forecastFcff).toBeCloseTo(final.fcff, 8);
+    expect(ss.maintenanceFcff).toBeCloseTo(final.fcff + final.capex - final.dAndA, 8);
+    expect(ss.reinvestmentRate).toBeCloseTo(0.025 / 0.20, 8);
+    expect(ss.reinvestment).toBeCloseTo(final.nopat * ss.reinvestmentRate, 8);
+    // The bridge must add up.
+    expect(ss.capitalisedFcff).toBeCloseTo(ss.maintenanceFcff - ss.reinvestment, 8);
+    // And the capitalised figure must be what the perpetuity actually used.
+    expect(r.gordon.terminal.undiscounted).toBeCloseTo(
+      (ss.capitalisedFcff * 1.025) / (0.10 - 0.025),
+      6
+    );
+  });
+
+  it('marks ROIC as floored rather than reported when it falls below the WACC', () => {
+    // Financials produce a sub-WACC ROIC from a meaningless denominator. The UI
+    // must not present that as the company's reported return.
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.02 });
+    const ss = r.gordon.terminal.steadyState;
+    expect(ss?.roic).toBeCloseTo(0.10, 8);
+    expect(ss?.roicFromAccounts).toBe(false);
+  });
+
+  it('reports the bridge as a no-op when the adjustment is off', () => {
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalCapexEqualsDA: false });
+    const ss = r.gordon.terminal.steadyState;
+    expect(ss?.reinvestment).toBe(0);
+    expect(ss?.capitalisedFcff).toBeCloseTo(r.forecast[4].fcff, 8);
+  });
+
   it('leaves the explicit forecast years untouched', () => {
     const r = runDcf(REF_INPUTS, HEAVY_INVESTOR);
     // Only the terminal value is normalised - the visible cashflows still show

@@ -22,7 +22,6 @@ export function SensitivityTable({
   const values = grid.cells.flat().filter((c): c is number => c !== null);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
-  const span = hi - lo || 1;
 
   // Diverging scale centred on the model's OWN answer, not the market price.
   // Shading against the price meant every cell went red the moment a company

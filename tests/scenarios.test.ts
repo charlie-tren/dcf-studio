@@ -147,3 +147,54 @@ describe('buildScenario - every fixture produces usable assumptions', () => {
     expect(Math.abs(a.revenueGrowth[0]), 'growth sane').toBeLessThan(1);
   });
 });
+
+describe('buildScenario - exit multiple', () => {
+  it('derives the exit multiple from the company own EV/EBITDA, not a fixed number', () => {
+    // A single multiple for every company is an arbitrary anchor shown with equal
+    // weight to the DCF: 8x was being used for Microsoft, Shell and a REIT alike.
+    const msft = buildScenario(fundamentals('MSFT'), 'base', 5, 0.09).assumptions.exitMultiple;
+    const shel = buildScenario(fundamentals('SHEL.L'), 'base', 5, 0.09).assumptions.exitMultiple;
+    expect(msft).not.toBeCloseTo(shel, 1);
+    // A software business should rate well above an oil major.
+    expect(msft).toBeGreaterThan(shel);
+  });
+
+  it('clamps the multiple to a defensible band', () => {
+    for (const t of ['MSFT', 'BHP.AX', 'ARB.AX', 'SHEL.L', 'SGP.AX', 'CBA.AX', 'MSB.AX']) {
+      const m = buildScenario(fundamentals(t), 'base', 5, 0.09).assumptions.exitMultiple;
+      expect(m, `${t} multiple`).toBeGreaterThanOrEqual(3);
+      expect(m, `${t} multiple`).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it('falls back to a default where EBITDA is negative', () => {
+    // Mesoblast loses money, so EV/EBITDA gives nothing usable.
+    const m = buildScenario(fundamentals('MSB.AX'), 'base', 5, 0.09).assumptions.exitMultiple;
+    expect(m).toBeCloseTo(8, 6);
+  });
+});
+
+describe('buildScenario - exit multiple disclosure', () => {
+  it('says when the multiple has been capped rather than presenting it as reported', () => {
+    // CBA's raw EV/EBITDA is 28.8x and RBC's 30.0x, because EBITDA is not a
+    // meaningful denominator for a bank. Presenting a silently-capped 20x as the
+    // company's own rating would be misleading.
+    for (const t of ['CBA.AX', 'RY.TO']) {
+      const r = buildScenario(fundamentals(t), 'base', 5, 0.09);
+      expect(r.assumptions.exitMultiple).toBeCloseTo(20, 6);
+      expect(r.notes.some((n) => /outside a defensible/i.test(n)), `${t} note`).toBe(true);
+    }
+  });
+
+  it('says when it has fallen back for want of positive EBITDA', () => {
+    const r = buildScenario(fundamentals('MSB.AX'), 'base', 5, 0.09);
+    expect(r.notes.some((n) => /no usable EV\/EBITDA/i.test(n))).toBe(true);
+  });
+
+  it('stays quiet when the company own multiple is used unmodified', () => {
+    for (const t of ['MSFT', 'BHP.AX', 'ARB.AX', 'SHEL.L']) {
+      const r = buildScenario(fundamentals(t), 'base', 5, 0.09);
+      expect(r.notes.some((n) => /EV\/EBITDA/i.test(n)), `${t} should be silent`).toBe(false);
+    }
+  });
+});

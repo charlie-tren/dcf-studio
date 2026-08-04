@@ -52,10 +52,17 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <h2 className="pt-2 text-xl font-semibold text-white">Terminal value</h2>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Both methods are shown, because terminal value is usually most of the answer and the gap
-          between the two is the honest measure of how much rests on assumption. Gordon growth
-          requires terminal growth below the WACC; where it is not, the calculation is blocked rather
-          than fudged. Terminal value sits at the end of the final explicit year, so it discounts at
-          full <em>t</em> even when the cashflows use the mid-year convention.
+          between the two says how much rests on assumption. Perpetuity growth requires terminal
+          growth below the WACC; where it is not, the calculation is blocked rather than fudged.
+        </p>
+        <p className="leading-relaxed text-[var(--text-dim)]">
+          The exit multiple defaults to the company&apos;s own current EV/EBITDA rather than a fixed
+          number - a single multiple applied to a software business, an oil major and a property trust
+          alike is an arbitrary anchor, not a second opinion. It is clamped to 3-20x, because a
+          depressed or blown-out trailing multiple should not be projected five years out unchallenged.
+          Note what this makes it: anchored to today&apos;s price, so it answers &quot;what if the
+          rating holds&quot; rather than providing an independent intrinsic check. The perpetuity
+          method is the intrinsic one.
         </p>
         <p className="leading-relaxed text-[var(--text-dim)]">
           The terminal year is put on a steady-state footing, which matters more than it sounds and

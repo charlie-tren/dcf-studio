@@ -98,12 +98,25 @@ function terminalDiscountFactor(a: Assumptions): number {
  * business earns exactly its cost of capital and growth adds no value, which is
  * the neutral assumption rather than a flattering one.
  */
-function terminalFcff(finalYear: ForecastYear, a: Assumptions): number {
-  if (!a.terminalCapexEqualsDA) return finalYear.fcff;
+type SteadyState = NonNullable<TerminalValue['steadyState']>;
+
+function terminalFcff(finalYear: ForecastYear, a: Assumptions): SteadyState {
+  const base: SteadyState = {
+    forecastFcff: finalYear.fcff,
+    maintenanceFcff: finalYear.fcff,
+    reinvestment: 0,
+    capitalisedFcff: finalYear.fcff,
+    roic: a.terminalRoic ?? a.wacc,
+    roicFromAccounts: a.terminalRoic !== null,
+    reinvestmentRate: 0,
+  };
+  if (!a.terminalCapexEqualsDA) return base;
 
   // Maintenance capex only: hold the asset base flat.
   const maintenanceFcff = finalYear.fcff + finalYear.capex - finalYear.dAndA;
-  if (a.terminalGrowth <= 0) return maintenanceFcff;
+  if (a.terminalGrowth <= 0) {
+    return { ...base, maintenanceFcff, capitalisedFcff: maintenanceFcff };
+  }
 
   // A ROIC below the cost of capital would mean growth destroys value, and a
   // ROIC below terminal growth implies reinvesting more than the business earns.
@@ -112,12 +125,21 @@ function terminalFcff(finalYear: ForecastYear, a: Assumptions): number {
   // value-destroying on what is usually a data artefact.
   const roic = Math.max(a.terminalRoic ?? a.wacc, a.wacc);
   const reinvestmentRate = Math.min(a.terminalGrowth / roic, 0.9);
-  // Never let the reinvestment charge flip the perpetuity negative - a negative
-  // terminal value is an artefact of the charge, not a valuation.
-  return Math.max(maintenanceFcff - finalYear.nopat * reinvestmentRate, 0);
+  const reinvestment = finalYear.nopat * reinvestmentRate;
+  return {
+    forecastFcff: finalYear.fcff,
+    maintenanceFcff,
+    reinvestment,
+    // Never let the reinvestment charge flip the perpetuity negative - a
+    // negative terminal value is an artefact of the charge, not a valuation.
+    capitalisedFcff: Math.max(maintenanceFcff - reinvestment, 0),
+    roic,
+    roicFromAccounts: a.terminalRoic !== null && a.terminalRoic >= a.wacc,
+    reinvestmentRate,
+  };
 }
 
-function gordonTerminal(finalFcff: number, a: Assumptions): TerminalValue {
+function gordonTerminal(steadyState: SteadyState, a: Assumptions): TerminalValue {
   if (a.terminalGrowth >= a.wacc) {
     return {
       method: 'gordon',
@@ -125,14 +147,17 @@ function gordonTerminal(finalFcff: number, a: Assumptions): TerminalValue {
       presentValue: 0,
       shareOfEv: 0,
       blocked: `Terminal growth of ${(a.terminalGrowth * 100).toFixed(2)}% must be below the WACC of ${(a.wacc * 100).toFixed(2)}% for a perpetuity to converge.`,
+      steadyState,
     };
   }
-  const undiscounted = (finalFcff * (1 + a.terminalGrowth)) / (a.wacc - a.terminalGrowth);
+  const undiscounted =
+    (steadyState.capitalisedFcff * (1 + a.terminalGrowth)) / (a.wacc - a.terminalGrowth);
   return {
     method: 'gordon',
     undiscounted,
     presentValue: undiscounted * terminalDiscountFactor(a),
     shareOfEv: 0,
+    steadyState,
   };
 }
 
@@ -169,8 +194,8 @@ export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
   const pvExplicit = discount(forecast, a);
 
   const finalYear = forecast[forecast.length - 1];
-  const steadyStateFcff = terminalFcff(finalYear, a);
-  const gordonTv = gordonTerminal(steadyStateFcff, a);
+  const steadyState = terminalFcff(finalYear, a);
+  const gordonTv = gordonTerminal(steadyState, a);
   const exitTv = exitMultipleTerminal(finalYear, a);
 
   const warnings: string[] = [];
