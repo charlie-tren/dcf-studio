@@ -202,7 +202,7 @@ export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
   if (gordonTv.blocked) warnings.push(gordonTv.blocked);
   if (a.terminalCapexEqualsDA && finalYear.capex > finalYear.dAndA * 1.25) {
     warnings.push(
-      `Capital expenditure runs at ${((finalYear.capex / finalYear.revenue) * 100).toFixed(1)}% of revenue against depreciation of ${((finalYear.dAndA / finalYear.revenue) * 100).toFixed(1)}%. A perpetuity has to be a steady state, so terminal capex is normalised to depreciation - otherwise the model assumes the company outspends its own depreciation forever.`
+      `Capital expenditure runs at ${((finalYear.capex / finalYear.revenue) * 100).toFixed(1)}% of revenue against depreciation of ${((finalYear.dAndA / finalYear.revenue) * 100).toFixed(1)}%. A perpetuity has to be a steady state, so the terminal year uses maintenance capex at depreciation and then charges the reinvestment terminal growth requires (g/ROIC of NOPAT). The bridge is shown under Terminal Value.`
     );
   }
   if (forecast.some((y) => y.fcff < 0)) {

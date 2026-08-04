@@ -267,3 +267,56 @@ Public site, general information only. Carries a plain disclaimer: not financial
 no relationship with Yahoo, figures derived from third-party data that may be wrong or
 stale. The output is deliberately framed as "what these assumptions imply", not "what
 this share is worth".
+
+---
+
+## 17. Addendum - what changed after the build (30/07/2026)
+
+The sections above are the pre-build design. Six defects surfaced during
+implementation and a panel audit afterwards changed the terminal-value treatment
+materially. Recorded here rather than edited into the sections above, so the
+original design intent and the reasons it changed both stay legible.
+
+**Data layer, found by inspecting real output rather than by failing tests:**
+
+1. Yahoo returns `date` as a live `Date`; `String(Date)` sorts by day name, so
+   MSFT came back 2022, 2024, 2025, 2023 and the "latest" year - which drives
+   base revenue, net debt and the share count - was wrong. ISO-normalised at the
+   fetch boundary.
+2. The RBA F2 CSV orders its columns 2y, 3y, 5y, **10y**, indexed. Reading
+   `cells[1]` returns the 2-year (4.561% vs 4.989%), a ~43bp error in every ASX
+   discount rate. Now selected by series ID `FCMYGBAG10D`.
+3. Bank EBIT derived as pretax + interest expense double-counts, because a bank's
+   reported revenue is already net of it: CBA showed a 194% EBIT margin.
+   Financials use pretax income as the proxy.
+4. Cost of debt was floored at the risk-free rate but never capped. CBA implied
+   20.4% and produced a negative equity value. Capped at 800bp.
+5. The cash chain took `cashAndCashEquivalents` first, ignoring marketable
+   securities - Alphabet holds USD 30.7bn cash against USD 96.1bn of short-term
+   investments, so net debt was overstated by 96bn. Broadest measure now wins.
+6. Consensus estimates were sorted by label, and `'+1y'.localeCompare('0y')` puts
+   +1y first, so next year's revenue was applied as year one. Consensus came out
+   *below* base for a company analysts are bullish on.
+
+**Terminal value - the substantive design change.** Section 10 specified a plain
+Gordon growth off the final year's FCFF. That is wrong in both directions:
+
+- Carrying a buildout capex rate into perpetuity understates value (Alphabet
+  spends ~22% of revenue on capex against ~5% depreciation; assuming that
+  persists forever cost ~44% of value per share).
+- Setting capex equal to depreciation and then growing the result is the opposite
+  error - zero net reinvestment with positive growth implies infinite return on
+  incremental capital, overstating terminal value by 9-33%.
+
+The build therefore applies the reinvestment identity, `g = ROIC x reinvestment
+rate`, so `FCFF_terminal = NOPAT x (1 - g / ROIC)`. ROIC comes from the company's
+own invested capital, floored at the WACC. The bridge is rendered on the page,
+because an assumption that moves the answer 9-33% cannot sit invisibly in the
+engine.
+
+Two related corrections: terminal value now discounts on the same convention as
+the explicit flows (discounting the flows at t-0.5 while the TV used full n
+understated the largest line by sqrt(1+WACC)), and the exit multiple defaults to
+the company's own EV/EBITDA clamped 3-20x rather than a fixed 8x for every
+company. Note this makes the exit column price-anchored - it answers "what if
+today's rating holds", not an independent intrinsic check.
