@@ -189,3 +189,31 @@ describe('normalise - sector and quality flags', () => {
     }
   });
 });
+
+describe('normalise - non-ordinary lines', () => {
+  it('flags a security with no market capitalisation as not ordinary equity', () => {
+    // CBAPJ.AX is a CBA hybrid note. Yahoo types it EQUITY like the ordinary
+    // line, so quoteType cannot separate them - but a listed ordinary share
+    // always has a market cap and a hybrid has none. Left unflagged it was
+    // handed CBA's entire A$28.7bn of group revenue and divided by the hybrid's
+    // own share count, producing A$79.12 for a A$100 face-value instrument.
+    const raw = fixture('CBA.AX');
+    const hybrid: RawTicker = {
+      ...raw,
+      quote: { ...raw.quote, price: { ...raw.quote.price, marketCap: undefined } },
+    };
+    const f = normalise('CBAPJ.AX', hybrid);
+    const flag = f.flags.find((x) => x.code === 'NOT_ORDINARY_EQUITY');
+    expect(flag).toBeDefined();
+    expect(flag?.severity).toBe('error');
+    expect(flag?.message).toMatch(/hybrid|preference|note/i);
+  });
+
+  it('does not flag an ordinary line that reports a market cap', () => {
+    for (const t of ['MSFT', 'CBA.AX', 'BHP.AX', 'SHEL.L']) {
+      const f = normalise(t, fixture(t));
+      expect(f.marketCap, `${t} market cap`).toBeGreaterThan(0);
+      expect(f.flags.some((x) => x.code === 'NOT_ORDINARY_EQUITY'), `${t}`).toBe(false);
+    }
+  });
+});

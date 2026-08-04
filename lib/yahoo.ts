@@ -67,11 +67,7 @@ export async function fetchTicker(ticker: string): Promise<RawTicker> {
 
 export type SearchHit = { symbol: string; name: string; exchange: string };
 
-export async function searchTickers(query: string): Promise<SearchHit[]> {
-  // The default of 5 quotes is not enough: a search for "woolworths" spends all
-  // five on Frankfurt, Hamburg, Johannesburg and Chi-X lines and never returns
-  // WOW.AX at all. Ask for more so the primary listing is in the set to rank.
-  const res = await yf.search(query, { quotesCount: 25, newsCount: 0 });
+function toHits(res: { quotes?: unknown[] }): SearchHit[] {
   return (res.quotes ?? [])
     .filter((q) => {
       const r = q as Record<string, unknown>;
@@ -85,6 +81,32 @@ export async function searchTickers(query: string): Promise<SearchHit[]> {
         exchange: String(r.exchange ?? ''),
       };
     });
+}
+
+/**
+ * Yahoo caps `search` at five quotes whatever `quotesCount` asks for, and which
+ * five depends on the caller's region. A bare "woolworths" from the default
+ * region spends them on Frankfurt, Hamburg and Chi-X lines; from an AU region it
+ * returns WOW.AX. Neither call alone is enough, so both run and merge.
+ *
+ * Two requests per keystroke-debounce is a real cost, but the alternative is an
+ * Australian user searching an Australian company by name and not finding it -
+ * which is the single most likely first interaction with this site.
+ */
+export async function searchTickers(query: string): Promise<SearchHit[]> {
+  const [primary, auRegion] = await Promise.all([
+    yf.search(query, { quotesCount: 25, newsCount: 0 }).catch(() => ({ quotes: [] })),
+    yf
+      .search(query, { quotesCount: 25, newsCount: 0, region: 'AU', lang: 'en-AU' } as never)
+      .catch(() => ({ quotes: [] })),
+  ]);
+
+  // Dedupe on symbol, keeping first-seen order so the primary region still leads.
+  const seen = new Map<string, SearchHit>();
+  for (const hit of [...toHits(primary), ...toHits(auRegion)]) {
+    if (!seen.has(hit.symbol)) seen.set(hit.symbol, hit);
+  }
+  return [...seen.values()];
 }
 
 /** Spot FX. Returns null when the pair cannot be resolved. */

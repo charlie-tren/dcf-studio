@@ -250,6 +250,23 @@ export function normalise(ticker: string, raw: RawTicker): Fundamentals {
     });
   }
 
+  // A hybrid, preference line or note carries NO market capitalisation, while a
+  // listed ordinary share always does. Yahoo types both as EQUITY, so quoteType
+  // cannot separate them - CBAPJ.AX (a CBA hybrid note) was being handed CBA's
+  // entire A$28.7bn of group revenue and divided by the hybrid's own share
+  // count, producing A$79.12 for a A$100 face-value fixed-income instrument.
+  // A DCF on a hybrid is category error: its value is the coupon and call
+  // schedule, not a claim on group free cashflow.
+  const marketCap = asNumber(nested(raw.quote.price, ['marketCap'])) ?? 0;
+  if (marketCap <= 0) {
+    flags.push({
+      code: 'NOT_ORDINARY_EQUITY',
+      severity: 'error',
+      message:
+        'This line has no market capitalisation, which means it is not ordinary shares - typically a hybrid, preference line, note or unlisted stub. A discounted cashflow values a claim on the whole business, so applying it here attributes all of the group’s revenue to a security that has no such claim. Its value is its coupon and call schedule. Look up the ordinary line instead.',
+    });
+  }
+
   const trend = (nested(raw.quote.earningsTrend, ['trend']) as Record<string, unknown>[]) ?? [];
   const analystRevenue = trend
     .filter((t) => ['0y', '+1y'].includes(String(t.period)))
@@ -290,7 +307,7 @@ export function normalise(ticker: string, raw: RawTicker): Fundamentals {
     quoteCurrency,
     years,
     price: asNumber(nested(raw.quote.price, ['regularMarketPrice'])) ?? 0,
-    marketCap: asNumber(nested(raw.quote.price, ['marketCap'])) ?? 0,
+    marketCap,
     rawBeta: asNumber(nested(raw.quote.defaultKeyStatistics, ['beta'])),
     analystRevenue,
     flags,

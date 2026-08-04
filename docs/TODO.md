@@ -6,10 +6,11 @@
   (commit 6506f39 in the hub repo, verified live on charlie-tren.github.io linking to
   dcf-studio.vercel.app with a dcf-studio.png thumbnail). This item was stale - written
   before the work was done and never re-checked.
-- [ ] **Bare "woolworths" search does not surface WOW.AX.** Yahoo caps `search` at 5 quotes
-  regardless of `quotesCount`, and for that term all five are the South African Woolworths
-  Holdings plus cross-listings. "woolworths group" ranks WOW.AX first. Options: a
-  region-biased second call (`region: 'AU'` returns a different five), or merging two calls.
+- [x] **Bare "woolworths" search does not surface WOW.AX** - DONE 30/07/2026. Yahoo caps
+  `search` at 5 quotes whatever `quotesCount` asks for, and WHICH five depends on the
+  caller's region. `searchTickers` now runs a default-region and an AU-region call in
+  parallel and merges on symbol. Verified live: woolworths, telstra, csl and commonwealth
+  bank all lead with the .AX line, and microsoft still leads with MSFT.
 
 - [ ] **Read Expectations Investing (Mauboussin & Rappaport) and rebuild the model on it.**
   Requested 30/07/2026. The book inverts the usual exercise: instead of forecasting

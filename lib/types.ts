@@ -22,7 +22,8 @@ export type DataQualityCode =
   | 'NEGATIVE_FCFF'
   | 'SHORT_HISTORY'
   | 'TERMINAL_GROWTH_BLOCKED'
-  | 'STALE_DATA';
+  | 'STALE_DATA'
+  | 'NOT_ORDINARY_EQUITY';
 
 export type DataQualityFlag = {
   code: DataQualityCode;

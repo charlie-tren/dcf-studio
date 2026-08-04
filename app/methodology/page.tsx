@@ -137,6 +137,12 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
             well below depreciation, it is substituted and flagged.
           </li>
           <li>
+            <strong>Hybrids and preference lines.</strong> Yahoo types a hybrid note the same as
+            ordinary shares, so a search for a bank can return both. A hybrid has no claim on group
+            free cashflow - its value is its coupon and call schedule - and it carries no market
+            capitalisation, which is how those lines are detected and flagged.
+          </li>
+          <li>
             <strong>Loss-makers.</strong> Terminal value ends up carrying essentially the whole
             valuation, which is disclosed rather than hidden.
           </li>
