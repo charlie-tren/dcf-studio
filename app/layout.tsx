@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { SiteHeader } from "./components/SiteHeader";
 import "./globals.css";
 
@@ -46,6 +47,15 @@ export default function RootLayout({
             . General information, not advice. Not affiliated with Yahoo.
           </div>
         </footer>
+        {/* Cloudflare Web Analytics. Feeds the private stats dashboard, which runs
+            one account-wide query and splits by `requestHost`, so this is
+            deliberately the same token as every other site in the estate.
+            Cookieless. `afterInteractive` keeps it off the hydration path. */}
+        <Script
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          strategy="afterInteractive"
+          data-cf-beacon='{"token": "32b821209b5441a08df42ccf61c9e6c2"}'
+        />
       </body>
     </html>
   );
