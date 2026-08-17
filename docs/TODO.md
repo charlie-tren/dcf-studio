@@ -54,8 +54,17 @@
   225.44 -> 268.65. Tests recompute the sheet's own formula chain and assert it ties to the
   site across five tickers. CSV not built: the point was the live calc chain, which CSV
   cannot carry.
-- [ ] Longer US history via SEC EDGAR `companyfacts` (free, keyless, official) to extend
-  beyond Yahoo's 4-5 annual periods.
+- [ ] **Longer US history via SEC EDGAR `companyfacts`.** Free, keyless, official.
+  **Probed 17/08/2026 - it is NOT the quick win it looks like.** The endpoint works
+  (`data.sec.gov/api/xbrl/companyfacts/CIK{10-digit}.json`, needs a User-Agent header)
+  and returns up to 11 annual periods, but coverage per line is RAGGED: on GOOGL,
+  `OperatingIncomeLoss` / capex / tax / cash all give 11 years, while `Revenues` gives
+  only 6 NON-CONTIGUOUS years (gaps at FY18-19 and FY22-24, because the company switched
+  XBRL tags to `RevenueFromContractWithCustomerExcludingAssessedTax`), D&A is under
+  neither standard tag, and diluted shares gives 2. So it needs a per-line tag-resolution
+  chain per company, and it is US-only - no ASX. Medium-large, not small. Also worth
+  asking first whether 11 years of history materially improves a 5-year model, given the
+  drivers are already short-run averages.
 - [x] **Custom domain** - DONE 11/08/2026 by Charlie. `charlietrenorden.com/dcf-studio`
   serves a redirect page to `dcf.charlietrenorden.com`, which serves the live app (verified
   17/08: HTTP 200, API returns a valuation). Same pattern as Crowdwise. The item was stale -
