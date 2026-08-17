@@ -12,45 +12,32 @@
   parallel and merges on symbol. Verified live: woolworths, telstra, csl and commonwealth
   bank all lead with the .AX line, and microsoft still leads with MSFT.
 
-- [ ] **Read Expectations Investing (Mauboussin & Rappaport) and rebuild the model on it.**
-  Requested 30/07/2026. The book inverts the usual exercise: instead of forecasting
-  cashflows to reach a value, start from the market price and solve for the expectations
-  embedded in it, then judge whether those are beatable. `lib/backsolve.ts` and the
-  "Priced in" panel are a crude first step in that direction, but the real framework is
-  more structured:
-  - **Value drivers** proper - sales growth, operating profit margin, incremental
-    investment rate - rather than the loose driver set used now.
-  - **Market-implied expectations** as the STARTING point of the page, not a footnote to a
-    DCF that disagrees with it.
-  - **Expectations infrastructure** - which driver the price is most sensitive to (the
-    "turbo trigger"), so a reader knows which assumption to interrogate first.
-  - **Historical benchmarking** of each implied driver against what the company has
-    actually achieved, which is the test of whether the expectation is plausible.
-  This is a genuine redesign of the model's spine, not a feature. Worth reading first and
-  deciding whether it replaces the current DCF-first framing or sits beside it as a second
-  mode.
+- [ ] **Market-implied expectations as a first-class mode ("Assumption Stress").**
+  Requested 30/07 and sharpened 05/08/2026; merged into one item 17/08 because the second
+  entry was the build spec for the first, not a separate project.
 
-- [ ] **"Assumption Stress" - ship market-implied expectations as a first-class mode.**
-  Requested 05/08/2026. Concrete build spec for the Expectations Investing item above,
-  not a separate project. Today the model runs forward: enter assumptions, get a value.
-  The inverse is rarer and more useful: enter today's price, solve for what the market
-  must be assuming.
-  - Entry point is the PRICE, not the driver panel. The page opens with "at $X, the
-    market is assuming...".
-  - Solve for the implied triplet - revenue growth, operating margin, and the duration
-    over which the company earns above its cost of capital. Show the solution surface,
-    not one point, since many combinations clear the same price.
-  - Sensitivity ranking: which driver moves value most from here (the "turbo trigger"),
-    so a reader knows which assumption to interrogate first.
-  - Plausibility check: benchmark each implied driver against what the company has
-    actually delivered historically. That comparison is the whole payoff - the reader
-    should be able to see at a glance whether the market is asking for something the
-    business has ever done.
-  - Stress grid: shock each implied driver and show the price that falls out, so the
-    reader can see how much has to go wrong to justify a lower price.
-  `lib/backsolve.ts` and the "Priced in" panel are the crude first step; this is the
-  full version. Decide alongside the Expectations Investing read whether it REPLACES the
-  DCF-first framing or sits beside it as a second mode.
+  **Step 1 - read Expectations Investing** (Mauboussin & Rappaport). The book inverts the
+  usual exercise: rather than forecasting cashflows to reach a value, start from the market
+  price and solve for the expectations embedded in it, then judge whether those are
+  beatable. Read before building - the point of the read is to decide whether this REPLACES
+  the DCF-first framing or sits beside it as a second mode.
+
+  **Step 2 - build.** `lib/backsolve.ts` and the "Priced In" panel are a crude first step;
+  the full version is:
+  - Entry point is the PRICE, not the driver panel. The page opens with "at $X, the market
+    is assuming...".
+  - Solve for the implied triplet - revenue growth, operating margin, and the **duration**
+    over which the company earns above its cost of capital. Show the **solution surface**,
+    not one point: many combinations clear the same price, so a single point estimate is
+    misleading.
+  - **Value drivers proper** - sales growth, operating profit margin, incremental investment
+    rate - rather than the loose driver set used now.
+  - **Turbo trigger**: rank which driver moves value most from here, so a reader knows which
+    assumption to interrogate first.
+  - **Plausibility check**: benchmark each implied driver against what the company has
+    actually delivered. This is the whole payoff - the reader should see at a glance whether
+    the market is asking for something the business has never done.
+  - **Stress grid**: shock each implied driver and show the price that falls out.
 
 ## Post-v1
 
@@ -63,4 +50,7 @@
   traceable calc chain, not pasted values).
 - [ ] Longer US history via SEC EDGAR `companyfacts` (free, keyless, official) to extend
   beyond Yahoo's 4-5 annual periods.
-- [ ] Custom domain, once one is bought for the hub cluster.
+- [x] **Custom domain** - DONE 11/08/2026 by Charlie. `charlietrenorden.com/dcf-studio`
+  serves a redirect page to `dcf.charlietrenorden.com`, which serves the live app (verified
+  17/08: HTTP 200, API returns a valuation). Same pattern as Crowdwise. The item was stale -
+  written when no domain existed.
