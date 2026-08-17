@@ -23,7 +23,7 @@ export function SiteHeader() {
             rel="noopener noreferrer"
             className="text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
           >
-            Other Projects <span aria-hidden="true">↗</span>
+            <span aria-hidden="true">←</span>&nbsp;Other projects
           </a>
         </nav>
       </div>
