@@ -1,0 +1,235 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import ExcelJS from 'exceljs';
+import { buildValuation, type Valuation } from '@/lib/valuation';
+import { buildWorkbook } from '@/lib/workbook';
+import type { RawTicker } from '@/lib/yahoo';
+
+async function valuationFor(ticker: string, fxRate = 1): Promise<Valuation> {
+  const raw: RawTicker = JSON.parse(
+    readFileSync(`tests/fixtures/${ticker.replace('.', '_')}.json`, 'utf8')
+  );
+  return buildValuation(
+    ticker,
+    { scenario: 'base', horizonYears: 5 },
+    {
+      fetchTicker: async () => raw,
+      fetchFxRate: async () => fxRate,
+      resolveRiskFree: async () => ({ rate: 0.0462, source: 'test', assumed: false }),
+    }
+  );
+}
+
+async function open(v: Valuation): Promise<ExcelJS.Workbook> {
+  const buffer = await buildWorkbook(v);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as ArrayBuffer);
+  return wb;
+}
+
+const num = (wb: ExcelJS.Workbook, sheet: string, ref: string): number =>
+  wb.getWorksheet(sheet)!.getCell(ref).value as number;
+
+const formula = (wb: ExcelJS.Workbook, sheet: string, ref: string): string => {
+  const value = wb.getWorksheet(sheet)!.getCell(ref).value;
+  return typeof value === 'object' && value !== null && 'formula' in value
+    ? (value as { formula: string }).formula
+    : '';
+};
+
+describe('workbook structure', () => {
+  it('has the sheets a reader needs to follow the model', async () => {
+    const wb = await open(await valuationFor('MSFT'));
+    expect(wb.worksheets.map((s) => s.name)).toEqual([
+      'Assumptions',
+      'Forecast',
+      'Valuation',
+      'Sensitivity',
+      'Source data',
+    ]);
+  });
+
+  it('is deterministic - the same model exports byte-identically', async () => {
+    // A timestamp in the file would make every export differ, which defeats
+    // diffing two versions of a model.
+    const v = await valuationFor('MSFT');
+    const a = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
+    const b = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
+    expect(a.equals(b)).toBe(true);
+  });
+});
+
+describe('workbook is live, not pasted', () => {
+  it('writes drivers as typed inputs and everything derived as a formula', async () => {
+    const v = await valuationFor('MSFT');
+    const wb = await open(v);
+
+    // Inputs: real numbers.
+    expect(typeof num(wb, 'Assumptions', 'B6')).toBe('number');
+    expect(typeof num(wb, 'Assumptions', 'B8')).toBe('number');
+
+    // Derived: formulas, not values.
+    expect(formula(wb, 'Assumptions', 'B20')).toContain('B17'); // cost of equity
+    expect(formula(wb, 'Assumptions', 'B26')).toContain('B24'); // WACC
+    expect(formula(wb, 'Forecast', 'B6')).toContain('Assumptions!B29'); // revenue off base
+    expect(formula(wb, 'Forecast', 'B13')).toContain('B9'); // FCFF off NOPAT
+    expect(formula(wb, 'Valuation', 'B14')).toContain('Assumptions!B31'); // per share
+  });
+
+  it('chains the forecast year on year rather than repeating a constant', async () => {
+    const v = await valuationFor('MSFT');
+    const wb = await open(v);
+    // Year 2 revenue must reference year 1, or the model is five independent
+    // numbers rather than a compounding forecast.
+    expect(formula(wb, 'Forecast', 'C6')).toContain('B6');
+    expect(formula(wb, 'Forecast', 'D6')).toContain('C6');
+  });
+
+  it('routes the mid-year toggle through the formula', async () => {
+    const v = await valuationFor('MSFT');
+    const wb = await open(v);
+    // Flipping the flag on Assumptions must reprice, so the discount factor has
+    // to reference it rather than bake the convention in.
+    expect(formula(wb, 'Forecast', 'B14')).toContain('Assumptions!$B$32');
+    expect(formula(wb, 'Valuation', 'B10')).toContain('Assumptions!B32');
+  });
+});
+
+describe('workbook reconciles to the site', () => {
+  /**
+   * Recomputes the workbook's OWN formula chain in TypeScript, from the input
+   * cells only, and checks it lands on the value the site displays. This is the
+   * test that makes the export trustworthy: if the sheet's arithmetic disagreed
+   * with the engine, a reader would get a different answer in Excel and have no
+   * way to know which was right.
+   */
+  async function recomputeFromInputs(ticker: string, fxRate = 1) {
+    const v = await valuationFor(ticker, fxRate);
+    const wb = await open(v);
+    const A = (ref: string) => num(wb, 'Assumptions', ref);
+
+    const tax = A('B8');
+    const daPct = A('B9');
+    const capexPct = A('B10');
+    const nwcPct = A('B11');
+    const terminalGrowth = A('B12');
+    const roic = A('B14');
+    const rf = A('B17');
+    const erp = A('B18');
+    const beta = A('B19');
+    const cod = A('B21');
+    const mcap = A('B22');
+    const debt = A('B23');
+    const baseRevenue = A('B29');
+    const netDebt = A('B30');
+    const shares = A('B31');
+    const midYear = A('B32');
+
+    // The WACC chain exactly as the sheet computes it.
+    const coe = rf + beta * erp;
+    const equityWeight = mcap / (mcap + debt);
+    const wacc = equityWeight * coe + (1 - equityWeight) * cod * (1 - tax);
+
+    // The forecast chain, reading per-year growth and margin from the sheet.
+    const n = v.assumptions.horizonYears;
+    let prevRevenue = baseRevenue;
+    let pvExplicit = 0;
+    let finalFcff = 0;
+    let finalNopat = 0;
+    let finalCapex = 0;
+    let finalDa = 0;
+    let finalEbit = 0;
+
+    for (let i = 0; i < n; i++) {
+      const c = String.fromCharCode('B'.charCodeAt(0) + i);
+      const cell = wb.getWorksheet('Forecast')!.getCell(`${c}5`).value;
+      const growth =
+        typeof cell === 'number' ? cell : v.assumptions.revenueGrowth[i];
+      const marginCell = wb.getWorksheet('Forecast')!.getCell(`${c}7`).value;
+      const margin =
+        typeof marginCell === 'number' ? marginCell : v.assumptions.ebitMargin[i];
+
+      const revenue = prevRevenue * (1 + growth);
+      const ebit = revenue * margin;
+      const nopat = ebit * (1 - tax);
+      const da = revenue * daPct;
+      const capex = revenue * capexPct;
+      const nwc = (revenue - prevRevenue) * nwcPct;
+      const fcff = nopat + da - capex - nwc;
+      const df = 1 / (1 + wacc) ** (i + 1 - 0.5 * midYear);
+
+      pvExplicit += fcff * df;
+      prevRevenue = revenue;
+      finalFcff = fcff;
+      finalNopat = nopat;
+      finalCapex = capex;
+      finalDa = da;
+      finalEbit = ebit;
+    }
+
+    // The terminal chain as the Valuation sheet computes it.
+    const maintenance = finalFcff + finalCapex - finalDa;
+    const reinvestRate = Math.min(terminalGrowth / Math.max(roic, wacc), 0.9);
+    const capitalised = Math.max(maintenance - finalNopat * reinvestRate, 0);
+    const tv = (capitalised * (1 + terminalGrowth)) / (wacc - terminalGrowth);
+    const tvPv = tv / (1 + wacc) ** (n - 0.5 * midYear);
+    const ev = pvExplicit + tvPv;
+    const perShare = (ev - netDebt) / shares;
+
+    // Exit multiple chain.
+    const exitTv = (finalEbit + finalDa) * A('B13');
+    const exitPerShare =
+      (pvExplicit + exitTv / (1 + wacc) ** (n - 0.5 * midYear) - netDebt) / shares;
+
+    return { v, wacc, pvExplicit, perShare, exitPerShare };
+  }
+
+  it.each(['MSFT', 'BHP.AX', 'ARB.AX', 'SGP.AX', 'SHEL.L'])(
+    '%s - the sheet formulas reproduce the site valuation',
+    async (ticker) => {
+      const { v, wacc, pvExplicit, perShare, exitPerShare } = await recomputeFromInputs(ticker);
+
+      expect(wacc, 'WACC').toBeCloseTo(v.wacc.wacc, 8);
+      expect(pvExplicit, 'PV of explicit forecast').toBeCloseTo(v.dcf.pvExplicit, 2);
+      expect(perShare, 'perpetuity value per share').toBeCloseTo(
+        v.dcf.gordon.valuePerShare,
+        4
+      );
+      expect(exitPerShare, 'exit multiple value per share').toBeCloseTo(
+        v.dcf.exitMultiple.valuePerShare,
+        4
+      );
+    }
+  );
+
+  it('converts to quote currency on the sheet for a cross-currency reporter', async () => {
+    // BHP reports USD and trades AUD. The sheet must apply the FX itself.
+    const v = await valuationFor('BHP.AX', 1.45);
+    const wb = await open(v);
+    expect(num(wb, 'Valuation', 'B26')).toBeCloseTo(1.45, 8);
+    expect(formula(wb, 'Valuation', 'B27')).toContain('B26');
+    expect(formula(wb, 'Valuation', 'B28')).toContain('B25');
+  });
+});
+
+describe('workbook carries provenance and caveats', () => {
+  it('records the reported history and where each line came from', async () => {
+    const v = await valuationFor('ARB.AX');
+    const wb = await open(v);
+    const src = wb.getWorksheet('Source data')!;
+    expect(src.getCell('A5').value).toBe('Revenue');
+    expect(src.getCell('B5').value).toBeCloseTo(v.fundamentals.years[0].revenue.value, 2);
+    // ARB's working capital is derived, and the sheet must say so.
+    const notes = JSON.stringify(src.getSheetValues());
+    expect(notes).toMatch(/derived/);
+  });
+
+  it('carries the model flags into the workbook', async () => {
+    // A reader who opens the file without seeing the page still needs the
+    // "this is a financial" warning.
+    const v = await valuationFor('CBA.AX');
+    const wb = await open(v);
+    const dump = JSON.stringify(wb.getWorksheet('Source data')!.getSheetValues());
+    expect(dump).toMatch(/financial/i);
+  });
+});

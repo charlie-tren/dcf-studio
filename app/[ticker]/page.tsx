@@ -72,6 +72,9 @@ export default async function ModelPage({ params, searchParams }: Props) {
     fxRate: valuation.fxRate,
   });
 
+  const exportQuery = new URLSearchParams(query);
+  exportQuery.set('ticker', decodeURIComponent(ticker));
+
   return (
     <main className="mx-auto max-w-5xl space-y-12 px-6 py-10">
       <Headline v={valuation} />
@@ -111,7 +114,20 @@ export default async function ModelPage({ params, searchParams }: Props) {
       />
       <ImpliedPanel implied={valuation.implied} assumptions={valuation.assumptions} />
 
-      <p className="border-t border-[var(--border)] pt-6 text-sm leading-relaxed text-[var(--text-faint)]">
+      <div className="border-t border-[var(--border)] pt-6">
+        <a
+          href={`/api/export?${exportQuery.toString()}`}
+          className="inline-flex items-center gap-2 rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--text-dim)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
+        >
+          Download as Excel
+          <span aria-hidden="true">↓</span>
+        </a>
+        <p className="mt-2 text-xs text-[var(--text-faint)]">
+          Live formulas, not pasted numbers - edit a driver and the workbook reprices.
+        </p>
+      </div>
+
+      <p className="text-sm leading-relaxed text-[var(--text-faint)]">
         Yahoo Finance and RBA data. General information, not advice.{' '}
         <Link
           href="/methodology"
