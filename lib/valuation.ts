@@ -145,7 +145,7 @@ export async function buildValuation(
     flags.push({
       code: 'BETA_CLAMPED',
       severity: 'warn',
-      message: `Reported beta of ${wacc.rawBeta?.toFixed(3)} is outside a defensible range and has been clamped to ${wacc.beta.toFixed(2)}.`,
+      message: `Beta of ${wacc.rawBeta?.toFixed(3)} is not usable in a cost of equity. Clamped to ${wacc.beta.toFixed(2)}.`,
     });
   }
   if (wacc.riskFreeAssumed) {

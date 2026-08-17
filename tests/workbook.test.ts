@@ -5,6 +5,16 @@ import { buildValuation, type Valuation } from '@/lib/valuation';
 import { buildWorkbook } from '@/lib/workbook';
 import type { RawTicker } from '@/lib/yahoo';
 
+/** Reads xl/workbook.xml out of the .xlsx zip, to assert on what actually ships. */
+async function readWorkbookXml(buffer: Buffer): Promise<string> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+  // ExcelJS does not expose the raw part, so re-read the zip directly.
+  const { default: JSZip } = await import('jszip');
+  const zip = await JSZip.loadAsync(buffer);
+  return zip.file('xl/workbook.xml')!.async('string');
+}
+
 async function valuationFor(ticker: string, fxRate = 1): Promise<Valuation> {
   const raw: RawTicker = JSON.parse(
     readFileSync(`tests/fixtures/${ticker.replace('.', '_')}.json`, 'utf8')
@@ -56,6 +66,68 @@ describe('workbook structure', () => {
     const a = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
     const b = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
     expect(a.equals(b)).toBe(true);
+  });
+});
+
+describe('workbook renders without a recalculation', () => {
+  /**
+   * The bug this guards: ExcelJS writes a formula cell as <f> with no <v>, so a
+   * reader whose Excel has automatic calculation off - and Google Sheets,
+   * Numbers, and every file previewer - sees a BLANK sheet. The Forecast and
+   * Valuation tabs shipped empty for exactly that reason.
+   *
+   * It survived the first round of testing because the COM check called
+   * CalculateFullRebuild(), which is the one thing a real reader never does.
+   * These assertions read the cached result only.
+   */
+  it('caches a computed result on every formula cell', async () => {
+    const v = await valuationFor('MSFT');
+    const wb = await open(v);
+    const missing: string[] = [];
+
+    for (const sheet of wb.worksheets) {
+      sheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          const value = cell.value;
+          if (value !== null && typeof value === 'object' && 'formula' in value) {
+            const result = (value as { result?: unknown }).result;
+            if (result === undefined || result === null) {
+              missing.push(`${sheet.name}!${cell.address}`);
+            }
+          }
+        });
+      });
+    }
+    expect(missing, `formula cells with no cached value: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('shows the site numbers straight from the cache, with no recalculation', async () => {
+    const v = await valuationFor('MSFT');
+    const wb = await open(v);
+    const cached = (sheet: string, ref: string) =>
+      (wb.getWorksheet(sheet)!.getCell(ref).value as { result: number }).result;
+
+    expect(cached('Assumptions', 'B26'), 'WACC').toBeCloseTo(v.wacc.wacc, 8);
+    expect(cached('Forecast', 'B6'), 'year 1 revenue').toBeCloseTo(v.dcf.forecast[0].revenue, 2);
+    expect(cached('Forecast', 'B17'), 'PV explicit').toBeCloseTo(v.dcf.pvExplicit, 2);
+    expect(cached('Valuation', 'B14'), 'perpetuity per share').toBeCloseTo(
+      v.dcf.gordon.valuePerShare,
+      6
+    );
+    expect(cached('Valuation', 'B22'), 'exit per share').toBeCloseTo(
+      v.dcf.exitMultiple.valuePerShare,
+      6
+    );
+  });
+
+  it('asks Excel to recalculate on open so an edit is never stale', async () => {
+    // Assert on the FILE, not on ExcelJS's in-memory round-trip: calcProperties
+    // is written to xl/workbook.xml but is not read back into the object model,
+    // so checking the loaded workbook tests the library rather than the output.
+    const v = await valuationFor('MSFT');
+    const buffer = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
+    const xml = await readWorkbookXml(buffer);
+    expect(xml).toMatch(/<calcPr[^>]*fullCalcOnLoad="1"/);
   });
 });
 

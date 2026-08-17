@@ -25,10 +25,10 @@ export function FlagList({ flags }: { flags: DataQualityFlag[] }) {
           key={`${flag.code}-${i}`}
           className={`rounded-r border-l-2 px-4 py-3 text-sm leading-relaxed ${STYLES[flag.severity]}`}
         >
-          <span className="mr-2 text-[11px] tracking-wide text-[var(--text-faint)] uppercase">
+          <span className="mr-2.5 text-[11px] tracking-wide text-[var(--text-faint)] uppercase">
             {LABEL[flag.severity]}
           </span>
-          {flag.message}
+          <span>{flag.message}</span>
         </div>
       ))}
     </div>

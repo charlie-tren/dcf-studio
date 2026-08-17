@@ -246,7 +246,7 @@ export function normalise(ticker: string, raw: RawTicker): Fundamentals {
     flags.push({
       code: 'CURRENCY_MISMATCH',
       severity: 'warn',
-      message: `Accounts are reported in ${reportingCurrency} but the shares trade in ${quoteCurrency}. The model runs in ${reportingCurrency} and converts once, at the end.`,
+      message: `Reports in ${reportingCurrency}, trades in ${quoteCurrency}. Modelled in ${reportingCurrency}, converted at the end.`,
     });
   }
 

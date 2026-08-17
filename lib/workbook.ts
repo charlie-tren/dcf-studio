@@ -54,14 +54,29 @@ function inputCell(
   return cell;
 }
 
+/**
+ * Writes a formula AND its computed result.
+ *
+ * The cached result is not optional. A formula cell written without one has an
+ * <f> element and no <v>, so anything that does not recalculate on open renders
+ * it BLANK - Excel with automatic calculation switched off, Google Sheets,
+ * Numbers, and every file previewer. The Forecast and Valuation sheets shipped
+ * empty for exactly this reason, and a COM test that called
+ * CalculateFullRebuild() masked it, because forcing a recalc is the one thing a
+ * real reader does not do.
+ *
+ * The result comes from the engine, so the file shows the same numbers as the
+ * page the moment it opens, and recalculates to the same numbers if edited.
+ */
 function formulaCell(
   sheet: Sheet,
   ref: string,
   formula: string,
-  numFmt: string
+  numFmt: string,
+  result: number
 ): ExcelJS.Cell {
   const cell = sheet.getCell(ref);
-  cell.value = { formula, date1904: false };
+  cell.value = { formula, result, date1904: false };
   cell.numFmt = numFmt;
   return cell;
 }
@@ -75,6 +90,9 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'DCF Studio';
   wb.created = new Date(0); // Deterministic: the same model exports byte-identically.
+  // Belt and braces alongside the cached results: Excel recalculates on open, so
+  // an edited input is reflected even before the user touches a cell.
+  wb.calcProperties.fullCalcOnLoad = true;
 
   const ccy = v.fundamentals.reportingCurrency;
   const n = v.assumptions.horizonYears;
@@ -165,17 +183,18 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   inputCell(a, `B${w.rf}`, v.wacc.riskFreeRate, RATE);
   inputCell(a, `B${w.erp}`, v.wacc.equityRiskPremium, RATE);
   inputCell(a, `B${w.beta}`, v.wacc.beta, '0.000');
-  formulaCell(a, `B${w.coe}`, `B${w.rf}+B${w.beta}*B${w.erp}`, RATE);
+  formulaCell(a, `B${w.coe}`, `B${w.rf}+B${w.beta}*B${w.erp}`, RATE, v.wacc.costOfEquity);
   inputCell(a, `B${w.cod}`, v.wacc.costOfDebt, RATE);
   inputCell(a, `B${w.mcap}`, v.wacc.marketCap, MONEY);
   inputCell(a, `B${w.debt}`, v.wacc.totalDebt, MONEY);
-  formulaCell(a, `B${w.equityWeight}`, `B${w.mcap}/(B${w.mcap}+B${w.debt})`, RATE);
-  formulaCell(a, `B${w.debtWeight}`, `1-B${w.equityWeight}`, RATE);
+  formulaCell(a, `B${w.equityWeight}`, `B${w.mcap}/(B${w.mcap}+B${w.debt})`, RATE, v.wacc.equityWeight);
+  formulaCell(a, `B${w.debtWeight}`, `1-B${w.equityWeight}`, RATE, v.wacc.debtWeight);
   formulaCell(
     a,
     `B${w.wacc}`,
     `B${w.equityWeight}*B${w.coe}+B${w.debtWeight}*B${w.cod}*(1-B${rows.tax})`,
-    RATE
+    RATE,
+    v.wacc.wacc
   );
   a.getCell(`B${w.wacc}`).font = { bold: true };
   a.getCell(`C${w.rf}`).value = v.wacc.riskFreeSource;
@@ -256,41 +275,44 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     // Per-year growth and margin: year 1 points at the Assumptions input so the
     // single-driver case stays live; later years are their own inputs, which is
     // what makes a fading path editable rather than fixed.
+    const fy = v.dcf.forecast[i];
     if (i === 0) {
-      formulaCell(f, `${c}${r.growth}`, `Assumptions!B${rows.growth}`, RATE);
-      formulaCell(f, `${c}${r.margin}`, `Assumptions!B${rows.margin}`, RATE);
+      formulaCell(f, `${c}${r.growth}`, `Assumptions!B${rows.growth}`, RATE, v.assumptions.revenueGrowth[0]);
+      formulaCell(f, `${c}${r.margin}`, `Assumptions!B${rows.margin}`, RATE, v.assumptions.ebitMargin[0]);
     } else {
       const sameGrowth = v.assumptions.revenueGrowth[i] === v.assumptions.revenueGrowth[0];
       const sameMargin = v.assumptions.ebitMargin[i] === v.assumptions.ebitMargin[0];
       if (sameGrowth) {
-        formulaCell(f, `${c}${r.growth}`, `Assumptions!B${rows.growth}`, RATE);
+        formulaCell(f, `${c}${r.growth}`, `Assumptions!B${rows.growth}`, RATE, v.assumptions.revenueGrowth[i]);
       } else {
         inputCell(f, `${c}${r.growth}`, v.assumptions.revenueGrowth[i], RATE);
       }
       if (sameMargin) {
-        formulaCell(f, `${c}${r.margin}`, `Assumptions!B${rows.margin}`, RATE);
+        formulaCell(f, `${c}${r.margin}`, `Assumptions!B${rows.margin}`, RATE, v.assumptions.ebitMargin[i]);
       } else {
         inputCell(f, `${c}${r.margin}`, v.assumptions.ebitMargin[i], RATE);
       }
     }
 
     const priorRevenue = prev ? `${prev}${r.revenue}` : `Assumptions!B${base.revenue}`;
-    formulaCell(f, `${c}${r.revenue}`, `${priorRevenue}*(1+${c}${r.growth})`, MONEY);
-    formulaCell(f, `${c}${r.ebit}`, `${c}${r.revenue}*${c}${r.margin}`, MONEY);
-    formulaCell(f, `${c}${r.nopat}`, `${c}${r.ebit}*(1-Assumptions!B${rows.tax})`, MONEY);
-    formulaCell(f, `${c}${r.da}`, `${c}${r.revenue}*Assumptions!B${rows.da}`, MONEY);
-    formulaCell(f, `${c}${r.capex}`, `-${c}${r.revenue}*Assumptions!B${rows.capex}`, MONEY);
+    formulaCell(f, `${c}${r.revenue}`, `${priorRevenue}*(1+${c}${r.growth})`, MONEY, fy.revenue);
+    formulaCell(f, `${c}${r.ebit}`, `${c}${r.revenue}*${c}${r.margin}`, MONEY, fy.ebit);
+    formulaCell(f, `${c}${r.nopat}`, `${c}${r.ebit}*(1-Assumptions!B${rows.tax})`, MONEY, fy.nopat);
+    formulaCell(f, `${c}${r.da}`, `${c}${r.revenue}*Assumptions!B${rows.da}`, MONEY, fy.dAndA);
+    formulaCell(f, `${c}${r.capex}`, `-${c}${r.revenue}*Assumptions!B${rows.capex}`, MONEY, -fy.capex);
     formulaCell(
       f,
       `${c}${r.nwc}`,
       `-(${c}${r.revenue}-${priorRevenue})*Assumptions!B${rows.nwc}`,
-      MONEY
+      MONEY,
+      -fy.changeInNwc
     );
     formulaCell(
       f,
       `${c}${r.fcff}`,
       `${c}${r.nopat}+${c}${r.da}+${c}${r.capex}+${c}${r.nwc}`,
-      MONEY
+      MONEY,
+      fy.fcff
     );
     // Mid-year toggle lives in the formula, so flipping the flag on Assumptions
     // reprices without touching anything else.
@@ -298,16 +320,19 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
       f,
       `${c}${r.df}`,
       `1/(1+Assumptions!$B$${w.wacc})^(${i + 1}-0.5*Assumptions!$B$${base.midYear})`,
-      '0.0000'
+      '0.0000',
+      fy.discountFactor
     );
-    formulaCell(f, `${c}${r.pv}`, `${c}${r.fcff}*${c}${r.df}`, MONEY);
+    formulaCell(f, `${c}${r.pv}`, `${c}${r.fcff}*${c}${r.df}`, MONEY, fy.presentValue);
     f.getCell(`${c}${r.fcff}`).font = { bold: true };
     f.getCell(`${c}${r.pv}`).font = { bold: true };
   }
 
   const lastCol = col(n - 1);
   label(f, 17, 'Present value of the explicit forecast').font = { bold: true };
-  formulaCell(f, `B17`, `SUM(B${r.pv}:${lastCol}${r.pv})`, MONEY).font = { bold: true };
+  formulaCell(f, `B17`, `SUM(B${r.pv}:${lastCol}${r.pv})`, MONEY, v.dcf.pvExplicit).font = {
+    bold: true,
+  };
 
   // ----------------------------------------------------------------- Valuation
   const val = wb.addWorksheet('Valuation');
@@ -317,6 +342,9 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
 
   val.getCell('A1').value = `Valuation (${ccy})`;
   val.getCell('A1').font = { bold: true, size: 12 };
+
+  const ss = v.dcf.gordon.terminal.steadyState;
+  const finalYear = v.dcf.forecast[n - 1];
 
   sectionHeading(val, 3, 'Terminal value - perpetuity growth');
   const t = {
@@ -344,44 +372,67 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   label(val, t.equity, 'Equity value');
   label(val, t.perShare, 'Value per share');
 
-  formulaCell(val, `B${t.finalFcff}`, `Forecast!${lastCol}${r.fcff}`, MONEY);
+  formulaCell(val, `B${t.finalFcff}`, `Forecast!${lastCol}${r.fcff}`, MONEY, finalYear.fcff);
   // Maintenance capex: add back the excess of capex over depreciation.
   formulaCell(
     val,
     `B${t.maintenance}`,
     `B${t.finalFcff}-Forecast!${lastCol}${r.capex}-Forecast!${lastCol}${r.da}`,
-    MONEY
+    MONEY,
+    ss?.maintenanceFcff ?? finalYear.fcff
   );
   formulaCell(
     val,
     `B${t.reinvestRate}`,
     `MIN(Assumptions!B${rows.terminalGrowth}/MAX(Assumptions!B${rows.roic},Assumptions!B${w.wacc}),0.9)`,
-    RATE
+    RATE,
+    ss?.reinvestmentRate ?? 0
   );
   formulaCell(
     val,
     `B${t.reinvest}`,
     `-Forecast!${lastCol}${r.nopat}*B${t.reinvestRate}`,
-    MONEY
+    MONEY,
+    -(ss?.reinvestment ?? 0)
   );
-  formulaCell(val, `B${t.capitalised}`, `MAX(B${t.maintenance}+B${t.reinvest},0)`, MONEY);
+  formulaCell(
+    val,
+    `B${t.capitalised}`,
+    `MAX(B${t.maintenance}+B${t.reinvest},0)`,
+    MONEY,
+    ss?.capitalisedFcff ?? finalYear.fcff
+  );
   formulaCell(
     val,
     `B${t.tv}`,
     `B${t.capitalised}*(1+Assumptions!B${rows.terminalGrowth})/(Assumptions!B${w.wacc}-Assumptions!B${rows.terminalGrowth})`,
-    MONEY
+    MONEY,
+    v.dcf.gordon.terminal.undiscounted
   );
   // Terminal value discounts on the same convention as the flows.
   formulaCell(
     val,
     `B${t.tvPv}`,
     `B${t.tv}/(1+Assumptions!B${w.wacc})^(${n}-0.5*Assumptions!B${base.midYear})`,
-    MONEY
+    MONEY,
+    v.dcf.gordon.terminal.presentValue
   );
-  formulaCell(val, `B${t.ev}`, `Forecast!B17+B${t.tvPv}`, MONEY);
-  formulaCell(val, `B${t.netDebt}`, `-Assumptions!B${base.netDebt}`, MONEY);
-  formulaCell(val, `B${t.equity}`, `B${t.ev}+B${t.netDebt}`, MONEY);
-  formulaCell(val, `B${t.perShare}`, `B${t.equity}/Assumptions!B${base.shares}`, PER_SHARE);
+  formulaCell(val, `B${t.ev}`, `Forecast!B17+B${t.tvPv}`, MONEY, v.dcf.gordon.enterpriseValue);
+  formulaCell(
+    val,
+    `B${t.netDebt}`,
+    `-Assumptions!B${base.netDebt}`,
+    MONEY,
+    -(v.dcf.gordon.enterpriseValue - v.dcf.gordon.equityValue)
+  );
+  formulaCell(val, `B${t.equity}`, `B${t.ev}+B${t.netDebt}`, MONEY, v.dcf.gordon.equityValue);
+  formulaCell(
+    val,
+    `B${t.perShare}`,
+    `B${t.equity}/Assumptions!B${base.shares}`,
+    PER_SHARE,
+    v.dcf.gordon.valuePerShare
+  );
   val.getCell(`B${t.perShare}`).font = { bold: true, size: 12 };
   val.getCell(`A${t.perShare}`).font = { bold: true };
 
@@ -397,18 +448,38 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     val,
     `B${x.ebitda}`,
     `Forecast!${lastCol}${r.ebit}+Forecast!${lastCol}${r.da}`,
-    MONEY
+    MONEY,
+    finalYear.ebit + finalYear.dAndA
   );
-  formulaCell(val, `B${x.tv}`, `B${x.ebitda}*Assumptions!B${rows.exitMultiple}`, MONEY);
+  formulaCell(
+    val,
+    `B${x.tv}`,
+    `B${x.ebitda}*Assumptions!B${rows.exitMultiple}`,
+    MONEY,
+    v.dcf.exitMultiple.terminal.undiscounted
+  );
   formulaCell(
     val,
     `B${x.tvPv}`,
     `B${x.tv}/(1+Assumptions!B${w.wacc})^(${n}-0.5*Assumptions!B${base.midYear})`,
-    MONEY
+    MONEY,
+    v.dcf.exitMultiple.terminal.presentValue
   );
-  formulaCell(val, `B${x.ev}`, `Forecast!B17+B${x.tvPv}`, MONEY);
-  formulaCell(val, `B${x.equity}`, `B${x.ev}-Assumptions!B${base.netDebt}`, MONEY);
-  formulaCell(val, `B${x.perShare}`, `B${x.equity}/Assumptions!B${base.shares}`, PER_SHARE);
+  formulaCell(val, `B${x.ev}`, `Forecast!B17+B${x.tvPv}`, MONEY, v.dcf.exitMultiple.enterpriseValue);
+  formulaCell(
+    val,
+    `B${x.equity}`,
+    `B${x.ev}-Assumptions!B${base.netDebt}`,
+    MONEY,
+    v.dcf.exitMultiple.equityValue
+  );
+  formulaCell(
+    val,
+    `B${x.perShare}`,
+    `B${x.equity}/Assumptions!B${base.shares}`,
+    PER_SHARE,
+    v.dcf.exitMultiple.valuePerShare
+  );
   val.getCell(`B${x.perShare}`).font = { bold: true };
 
   sectionHeading(val, 24, 'Against the market');
@@ -418,8 +489,8 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   label(val, 28, 'Implied upside');
   inputCell(val, 'B25', v.fundamentals.price, PER_SHARE);
   inputCell(val, 'B26', v.fxRate, '0.0000');
-  formulaCell(val, 'B27', `B${t.perShare}*B26`, PER_SHARE);
-  formulaCell(val, 'B28', `B27/B25-1`, RATE);
+  formulaCell(val, 'B27', `B${t.perShare}*B26`, PER_SHARE, v.valuePerShareQuoted);
+  formulaCell(val, 'B28', `B27/B25-1`, RATE, v.upside);
   val.getCell('B28').font = { bold: true };
 
   // --------------------------------------------------------------- Sensitivity

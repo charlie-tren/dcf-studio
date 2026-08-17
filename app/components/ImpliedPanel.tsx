@@ -30,7 +30,7 @@ export function ImpliedPanel({
     <section>
       <h2 className="text-lg font-semibold text-white">Priced In</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
-Each input solved to today&apos;s price, holding the others. Alternatives, not a set.
+What each input would have to be to justify the current price, one at a time.
       </p>
 
       <div className="mt-4 overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)]">
