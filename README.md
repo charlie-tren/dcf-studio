@@ -4,6 +4,9 @@ Type a company. Get a discounted cashflow valuation built from its own reported 
 with every assumption on the surface and every line traceable back to the field it came
 from.
 
+Live at **https://dcf.charlietrenorden.com** (also reachable at
+charlietrenorden.com/dcf-studio and dcf-studio.vercel.app).
+
 ## Running locally
 
 ```bash
