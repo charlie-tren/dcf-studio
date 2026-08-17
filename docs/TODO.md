@@ -46,8 +46,14 @@
   anyway; the correct fix is to detect the financial sector and switch to a DDM or
   excess-returns model. Probe evidence: CBA.AX and RY.TO both return no operating
   income. Charlie's call, 30/07/2026.
-- [ ] Excel / CSV export of the full model with live formulas (house style is a
-  traceable calc chain, not pasted values).
+- [x] **Excel export with live formulas** - DONE 17/08/2026. Five sheets (Assumptions,
+  Forecast, Valuation, Sensitivity, Source data). Only genuine inputs are typed values;
+  every derived figure is a formula, so editing a driver reprices the whole workbook.
+  Verified in Excel itself via COM: it computes WACC 10.6909%, PV 408.0578bn, perpetuity
+  225.4393, exit 454.6375 - identical to the site to 4dp - and a +5pp growth edit repriced
+  225.44 -> 268.65. Tests recompute the sheet's own formula chain and assert it ties to the
+  site across five tickers. CSV not built: the point was the live calc chain, which CSV
+  cannot carry.
 - [ ] Longer US history via SEC EDGAR `companyfacts` (free, keyless, official) to extend
   beyond Yahoo's 4-5 annual periods.
 - [x] **Custom domain** - DONE 11/08/2026 by Charlie. `charlietrenorden.com/dcf-studio`
