@@ -62,3 +62,7 @@ Yahoo Finance (statements, prices, betas, analyst estimates, FX) and the Reserve
 Australia (F2 capital market yields, the 10-year Australian Government series). Both free.
 
 General information only, not financial advice. Not affiliated with Yahoo.
+
+<!-- visibility: this repo went PRIVATE on 18/08/2026. Vercel deploys private repos
+     fine via its GitHub App; this line exists because that had to be PROVEN by a real
+     push rather than assumed. -->
