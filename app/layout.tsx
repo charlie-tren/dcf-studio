@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "DCF Studio",
   description:
-    "Type a company. Get a discounted cashflow valuation built from its own reported numbers, with every assumption on the surface.",
+    "Type a company. Get a discounted cashflow valuation built from its reported financials, with every assumption shown.",
 };
 
 export default function RootLayout({
