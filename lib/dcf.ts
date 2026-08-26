@@ -125,7 +125,15 @@ function terminalFcff(finalYear: ForecastYear, a: Assumptions): SteadyState {
   // value-destroying on what is usually a data artefact.
   const roic = Math.max(a.terminalRoic ?? a.wacc, a.wacc);
   const reinvestmentRate = Math.min(a.terminalGrowth / roic, 0.9);
-  const reinvestment = finalYear.nopat * reinvestmentRate;
+  // Floored at zero, because a loss-maker cannot fund growth out of negative
+  // NOPAT. Unfloored the charge came out negative and was then SUBTRACTED, so a
+  // business losing money was credited cash for growing: Mesoblast's sheet read
+  // "Less reinvestment to fund terminal growth 56.6" as a positive. It never
+  // reached a published valuation, because capitalised cashflow is floored at
+  // zero too and Mesoblast's maintenance line was negative anyway - but it moves
+  // the number wherever maintenance cashflow is positive on negative NOPAT,
+  // which large depreciation can produce, and it moves it the conservative way.
+  const reinvestment = Math.max(finalYear.nopat, 0) * reinvestmentRate;
   return {
     forecastFcff: finalYear.fcff,
     maintenanceFcff,

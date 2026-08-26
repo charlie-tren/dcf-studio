@@ -1,4 +1,5 @@
 import { perShare, signedPct } from '@/lib/format';
+import { quoteConversionFactor } from '@/lib/fx';
 import type { Valuation } from '@/lib/valuation';
 
 /**
@@ -13,15 +14,22 @@ import type { Valuation } from '@/lib/valuation';
  */
 export function ValueBar({ v }: { v: Valuation }) {
   const ccy = v.fundamentals.quoteCurrency;
-  const scaleToQuote =
-    v.dcf.gordon.valuePerShare === 0 ? 1 : v.valuePerShareQuoted / v.dcf.gordon.valuePerShare;
+  // The scale IS the conversion factor, so read it rather than backing it out of
+  // a division that needed a zero guard - and that would have been meaningless
+  // anyway on a name whose perpetuity is blocked.
+  const scaleToQuote = quoteConversionFactor({
+    reportingCurrency: v.fundamentals.reportingCurrency,
+    quoteCurrency: ccy,
+    fxRate: v.fxRate,
+  });
 
   const rows = [
-    {
-      label: 'Perpetuity growth',
-      value: v.valuePerShareQuoted,
-      kind: 'model' as const,
-    },
+    // A blocked perpetuity has no value to plot. A bar drawn from the leftover
+    // "explicit forecast less net debt" reads as this method's answer, which is
+    // the one thing the model is refusing to give.
+    ...(v.dcf.gordon.terminal.blocked
+      ? []
+      : [{ label: 'Perpetuity growth', value: v.valuePerShareQuoted, kind: 'model' as const }]),
     {
       label: 'Exit multiple',
       value: v.dcf.exitMultiple.valuePerShare * scaleToQuote,

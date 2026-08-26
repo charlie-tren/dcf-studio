@@ -15,13 +15,17 @@ async function readWorkbookXml(buffer: Buffer): Promise<string> {
   return zip.file('xl/workbook.xml')!.async('string');
 }
 
-async function valuationFor(ticker: string, fxRate = 1): Promise<Valuation> {
+async function valuationFor(
+  ticker: string,
+  fxRate = 1,
+  overrides: Parameters<typeof buildValuation>[1]['overrides'] = undefined
+): Promise<Valuation> {
   const raw: RawTicker = JSON.parse(
     readFileSync(`tests/fixtures/${ticker.replace('.', '_')}.json`, 'utf8')
   );
   return buildValuation(
     ticker,
-    { scenario: 'base', horizonYears: 5 },
+    { scenario: 'base', horizonYears: 5, overrides },
     {
       fetchTicker: async () => raw,
       fetchFxRate: async () => fxRate,
@@ -326,6 +330,15 @@ describe('workbook reconciles to the site', () => {
     expect(String(wb.getWorksheet('Valuation')!.getCell('C27').value)).toMatch(/sub-unit/);
   });
 
+  it('floors the terminal reinvestment formula, not just its cached result', async () => {
+    // The cached result comes from the engine and was already floored, so a
+    // cache-only assertion passes while Excel recalculates the floor away on
+    // open. Read the FORMULA. Same miss as the FX conversion cell.
+    const v = await valuationFor('MSB.AX');
+    const wb = await open(v);
+    expect(formula(wb, 'Valuation', 'B7')).toMatch(/^-MAX\(Forecast!F9,0\)\*B6$/);
+  });
+
   it('bridges enterprise to equity value on both terminal methods', async () => {
     // The exit-multiple block used to jump straight from EV to equity, hiding
     // the one step where the two methods could differ.
@@ -333,6 +346,36 @@ describe('workbook reconciles to the site', () => {
     const wb = await open(v);
     expect(wb.getWorksheet('Valuation')!.getCell('A21').value).toBe('Less net debt');
     expect(formula(wb, 'Valuation', 'B22')).toBe('B20+B21');
+  });
+});
+
+describe('workbook refuses rather than publishes a blocked perpetuity', () => {
+  /**
+   * Toyota's WACC of 2.38% sits below its 2.50% terminal growth, so the
+   * perpetuity cannot converge. The engine floors terminal value to nil and
+   * raises a flag, but the Valuation sheet then showed "(3,027.73) per share"
+   * with nothing on it saying the model had declined to answer.
+   */
+  const blockedNote = /Blocked: terminal growth is at or above the WACC/;
+
+  it('warns on the Valuation sheet when terminal growth is above the WACC', async () => {
+    const v = await valuationFor('MSFT', 1, { terminalGrowth: 0.5 });
+    expect(v.dcf.gordon.terminal.blocked, 'fixture must actually be blocked').toBeTruthy();
+    const wb = await open(v);
+    const cell = wb.getWorksheet('Valuation')!.getCell('C3').value as {
+      formula: string;
+      result: string;
+    };
+    expect(cell.result).toMatch(blockedNote);
+    // A formula, not a typed sentence: fixing the WACC in Excel must clear it.
+    expect(cell.formula).toMatch(/^IF\(Assumptions!B12>=Assumptions!B26,/);
+  });
+
+  it('says nothing on a model whose perpetuity converges', async () => {
+    const v = await valuationFor('MSFT');
+    expect(v.dcf.gordon.terminal.blocked).toBeFalsy();
+    const wb = await open(v);
+    expect(wb.getWorksheet('Valuation')!.getCell('C3').value ?? '').not.toMatch(blockedNote);
   });
 });
 

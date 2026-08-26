@@ -4,6 +4,15 @@ import type { Valuation } from '@/lib/valuation';
 export function Headline({ v }: { v: Valuation }) {
   const currency = v.fundamentals.quoteCurrency;
   const positive = v.upside >= 0;
+  /**
+   * Where terminal growth is at or above the WACC the perpetuity cannot
+   * converge, so the engine returns a terminal value of nil. What is left is
+   * the present value of five years' cashflow less net debt, which is a real
+   * quantity but not a valuation - Toyota's read "3,027.73 per share, -198.62%"
+   * in bold while the model was refusing to answer. TerminalComparison already
+   * shows the refusal in place of its number; these two never got the memo.
+   */
+  const blocked = v.dcf.gordon.terminal.blocked;
 
   return (
     <header>
@@ -20,9 +29,15 @@ export function Headline({ v }: { v: Valuation }) {
           <p className="text-xs tracking-wide text-[var(--text-faint)] uppercase">
             Implied value per share
           </p>
-          <p className="nums mt-1 text-5xl font-semibold text-[var(--accent)]">
-            {perShare(v.valuePerShareQuoted, currency)}
-          </p>
+          {blocked ? (
+            <p className="mt-1 text-3xl font-semibold text-[var(--text-dim)]">
+              No perpetuity value
+            </p>
+          ) : (
+            <p className="nums mt-1 text-5xl font-semibold text-[var(--accent)]">
+              {perShare(v.valuePerShareQuoted, currency)}
+            </p>
+          )}
         </div>
         <div>
           <p className="text-xs tracking-wide text-[var(--text-faint)] uppercase">Market price</p>
@@ -30,18 +45,23 @@ export function Headline({ v }: { v: Valuation }) {
             {perShare(v.fundamentals.price, currency)}
           </p>
         </div>
-        <div>
-          <p className="text-xs tracking-wide text-[var(--text-faint)] uppercase">
-            Implied upside
-          </p>
-          <p
-            className={`nums mt-1 text-2xl font-medium ${
-              positive ? 'text-[var(--accent)]' : 'text-[var(--negative)]'
-            }`}
-          >
-            {signedPct(v.upside)}
-          </p>
-        </div>
+        {/* No upside block at all when there is nothing to compare: a dash in
+            the slot still reads as a measurement that came out empty. The flag
+            directly below says why, so this does not repeat it. */}
+        {!blocked && (
+          <div>
+            <p className="text-xs tracking-wide text-[var(--text-faint)] uppercase">
+              Implied upside
+            </p>
+            <p
+              className={`nums mt-1 text-2xl font-medium ${
+                positive ? 'text-[var(--accent)]' : 'text-[var(--negative)]'
+              }`}
+            >
+              {signedPct(v.upside)}
+            </p>
+          </div>
+        )}
       </div>
 
       <p className="mt-5 text-sm text-[var(--text-dim)]">

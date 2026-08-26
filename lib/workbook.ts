@@ -119,6 +119,24 @@ function formulaCell(
   return cell;
 }
 
+/**
+ * A formula whose cached result is TEXT rather than a number. Same contract as
+ * formulaCell - the result has to be written, or a reader who does not
+ * recalculate sees a blank cell.
+ */
+function formulaTextCell(
+  sheet: Sheet,
+  ref: string,
+  formula: string,
+  result: string
+): ExcelJS.Cell {
+  const cell = sheet.getCell(ref);
+  cell.value = { formula, result, date1904: false };
+  cell.font = { size: 9, bold: true, color: { argb: 'FFC00000' } };
+  cell.alignment = { indent: 1, wrapText: true, vertical: 'top' };
+  return cell;
+}
+
 /** Column letter for forecast year i (0-based). Year 1 lands in column B. */
 function col(i: number): string {
   return String.fromCharCode('B'.charCodeAt(0) + i);
@@ -414,6 +432,30 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   const finalYear = v.dcf.forecast[n - 1];
 
   sectionHeading(val, 3, 'Terminal value - perpetuity growth');
+  /**
+   * Where terminal growth is at or above the WACC the perpetuity cannot
+   * converge and every figure in this block collapses to the explicit forecast
+   * less net debt - a real quantity, but not a valuation. Toyota's read
+   * "(3,027.73) per share" with nothing on the sheet saying why.
+   *
+   * A formula rather than a typed sentence, because the workbook is live: fix
+   * the WACC in the sheet and the warning clears itself, which a pasted string
+   * would not. Only written when the export is blocked - a formula returning ""
+   * on every other model is a cell with no cached result, which is the blank-
+   * cell bug formulaCell exists to prevent, and the suite catches it. It sits
+   * beside the heading rather than replacing any figure, so no arithmetic
+   * downstream breaks.
+   */
+  const blockedNote =
+    'Blocked: terminal growth is at or above the WACC, so there is no perpetuity value and the figures below are not a valuation.';
+  if (v.dcf.gordon.terminal.blocked) {
+    formulaTextCell(
+      val,
+      'C3',
+      `IF(Assumptions!B${rows.terminalGrowth}>=Assumptions!B${w.wacc},"${blockedNote}","")`,
+      blockedNote
+    );
+  }
   const t = {
     finalFcff: 4,
     maintenance: 5,
@@ -455,10 +497,14 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     RATE,
     ss?.reinvestmentRate ?? 0
   );
+  // MAX(...,0) mirrors the engine's floor. Without it the cached result said 0
+  // for a loss-maker and Excel recalculated it straight back to a positive
+  // credit on open - the same shape of miss as the FX conversion cell: engine
+  // fixed, sheet formula not.
   formulaCell(
     val,
     `B${t.reinvest}`,
-    `-Forecast!${lastCol}${r.nopat}*B${t.reinvestRate}`,
+    `-MAX(Forecast!${lastCol}${r.nopat},0)*B${t.reinvestRate}`,
     MONEY,
     -(ss?.reinvestment ?? 0)
   );

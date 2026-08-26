@@ -312,4 +312,22 @@ describe('runDcf - full reconciliation against an independent recompute', () => 
     const r = runDcf({ ...REF_INPUTS, dilutedShares: 0 }, REF_ASSUMPTIONS);
     expect(r.gordon.valuePerShare).toBe(0);
   });
+
+  it('charges no terminal reinvestment against negative NOPAT', () => {
+    // A loss-maker cannot fund growth out of a loss. Unfloored, the charge came
+    // out negative and was then subtracted, crediting the business cash for
+    // growing: Mesoblast's export read "Less reinvestment ... 56.6" as a
+    // positive. Floored, the charge is nil and the terminal year is carried by
+    // maintenance cashflow alone.
+    const lossMaker = runDcf(REF_INPUTS, {
+      ...REF_ASSUMPTIONS,
+      ebitMargin: Array(5).fill(-0.15),
+      terminalCapexEqualsDA: true,
+      terminalGrowth: 0.025,
+    });
+    const ss = lossMaker.gordon.terminal.steadyState!;
+    expect(lossMaker.forecast[4].nopat, 'the fixture must actually lose money').toBeLessThan(0);
+    expect(ss.reinvestment).toBe(0);
+    expect(ss.capitalisedFcff).toBe(Math.max(ss.maintenanceFcff, 0));
+  });
 });
