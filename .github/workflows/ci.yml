@@ -1,0 +1,26 @@
+name: CI
+
+# DCF Studio had 221 tests and no workflow at all. It deploys on push, so until
+# now the valuation maths, the WACC and terminal-value code, the FX handling and
+# the backsolve could all break and reach the live site with nothing objecting.
+#
+# Same shape as crowdwise's CI, which is the house pattern for the Next projects.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npm run build
