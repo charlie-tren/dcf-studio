@@ -637,8 +637,11 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     rc.border = { right: { style: 'thin' } };
     v.sensitivity.cells[i].forEach((cellValue, j) => {
       const c = s.getCell(`${col(j)}${row}`);
+      // 'n/a' is a string and would left-align against right-aligned figures.
+      // Toyota's grid is mostly blocked cells, and it read as a jumble.
       c.value = cellValue === null ? 'n/a' : cellValue;
       c.numFmt = PER_SHARE;
+      c.alignment = { horizontal: 'right' };
       if (i === v.sensitivity.centre.waccIndex && j === v.sensitivity.centre.growthIndex) {
         c.font = { bold: true };
         c.border = {
@@ -738,7 +741,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   }
   noteRow++;
   src.getCell(`A${noteRow}`).value =
-    'Data: Yahoo Finance; Australian risk-free rates from the RBA. General information, not advice.';
+    `Data: Yahoo Finance. Risk-free rate: ${v.wacc.riskFreeSource}. General information, not advice.`;
   src.getCell(`A${noteRow}`).font = { size: 9, color: { argb: GREY } };
 
   return wb.xlsx.writeBuffer();
