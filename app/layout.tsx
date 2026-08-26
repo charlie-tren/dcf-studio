@@ -56,6 +56,14 @@ export default function RootLayout({
           strategy="afterInteractive"
           data-cf-beacon='{"token": "32b821209b5441a08df42ccf61c9e6c2"}'
         />
+        {/* Returning people, which Web Analytics cannot answer: it is cookieless
+            and carries no visitor identifier. This reads a date stamp from the
+            visitor's own localStorage and reports two words once per session,
+            new or returning plus an age bucket. See site-stats/beacon. */}
+        <Script
+          src="https://beacon.charlietrenorden.com/b.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
