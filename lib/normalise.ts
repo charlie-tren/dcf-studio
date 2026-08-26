@@ -1,4 +1,4 @@
-import { QUOTE_SUBUNIT_DIVISOR } from './markets';
+import { majorCurrency } from './fx';
 import type { DataQualityFlag, FiscalYear, Fundamentals, Sourced } from './types';
 import type { RawStatementRow, RawTicker } from './yahoo';
 
@@ -190,9 +190,9 @@ function buildYear(
   };
 }
 
-/** The major currency behind a possibly-sub-unit quote code. GBp -> GBP. */
+/** The major currency behind a possibly-sub-unit quote code. One table, one answer. */
 function majorOf(quoteCurrency: string): string {
-  return quoteCurrency in QUOTE_SUBUNIT_DIVISOR ? quoteCurrency.toUpperCase() : quoteCurrency;
+  return majorCurrency(quoteCurrency);
 }
 
 export function normalise(ticker: string, raw: RawTicker): Fundamentals {

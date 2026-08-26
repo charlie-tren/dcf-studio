@@ -14,14 +14,29 @@ export type Market = {
 };
 
 /**
- * Currencies quoted in a sub-unit. Divide the quoted price by this to get the
- * major unit. Shell quotes GBp (pence) while reporting USD - the 100x trap.
+ * Currencies quoted in a sub-unit: the divisor that takes a quoted price to the
+ * major unit, and the major currency code itself. Shell quotes GBp (pence)
+ * while reporting USD - the 100x trap.
+ *
+ * The major code has to be written down rather than derived. It used to be
+ * computed as `code.toUpperCase()`, which is right for GBp -> GBP and wrong for
+ * both of the others: ZAc's major unit is the rand, not "ZAC", and ILA's is the
+ * shekel. Yahoo happens to serve a USDZAC=X pair quoting the rate in cents, so
+ * the FX rate came back already sub-unit-adjusted and was then multiplied by
+ * 100 again - Naspers valued at 2,407,080c against a price of 76,546c, a 3,045%
+ * upside. USDILA=X does not resolve at all, so Teva silently fell back to a rate
+ * of 1. Two of the three sub-unit markets were wrong.
  */
-export const QUOTE_SUBUNIT_DIVISOR: Record<string, number> = {
-  GBp: 100,
-  ZAc: 100,
-  ILA: 100,
+export const QUOTE_SUBUNIT: Record<string, { divisor: number; major: string }> = {
+  GBp: { divisor: 100, major: 'GBP' },
+  ZAc: { divisor: 100, major: 'ZAR' },
+  ILA: { divisor: 100, major: 'ILS' },
 };
+
+/** Divide a quoted price by this to reach the major unit. */
+export const QUOTE_SUBUNIT_DIVISOR: Record<string, number> = Object.fromEntries(
+  Object.entries(QUOTE_SUBUNIT).map(([code, { divisor }]) => [code, divisor])
+);
 
 const US: Market = {
   suffix: '',

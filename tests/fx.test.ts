@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  quoteConversionFactor,
   toQuoteDisplayUnits,
   priceInMajorUnits,
   majorCurrency,
@@ -51,13 +52,46 @@ describe('priceInMajorUnits', () => {
 });
 
 describe('majorCurrency', () => {
-  it('maps a sub-unit code to its major currency', () => {
+  /**
+   * This used to assert ZAc -> "ZAC", which is not a currency. The function
+   * upper-cased the code, which is right for sterling and wrong for the other
+   * two, and the test locked that in: the rand is ZAR and the shekel is ILS.
+   *
+   * What it cost. Yahoo does serve a USDZAC=X pair, quoting the rate in cents,
+   * so the FX rate arrived already sub-unit-adjusted and the x100 was then
+   * applied on top - Naspers came out at 2,407,080c against a price of 76,546c,
+   * a 3,045% upside. USDILA=X does not resolve, so Teva fell through to a rate
+   * of 1 and read -88%. Sterling was the only one of the three that worked.
+   */
+  it('maps a sub-unit code to its real major currency', () => {
     expect(majorCurrency('GBp')).toBe('GBP');
-    expect(majorCurrency('ZAc')).toBe('ZAC');
+    expect(majorCurrency('ZAc')).toBe('ZAR');
+    expect(majorCurrency('ILA')).toBe('ILS');
   });
 
   it('leaves a major currency untouched', () => {
     expect(majorCurrency('USD')).toBe('USD');
+  });
+
+  it('treats a sub-unit quote of its own major currency as no conversion', () => {
+    // A rand reporter quoting cents needs the x100 and no FX at all. Before the
+    // fix majorCurrency said "ZAC", which does not equal "ZAR", so the model
+    // went looking for a ZAR-to-ZAC rate, got 100 from Yahoo, and multiplied by
+    // 100 again: Sasol at 7,826,029c against a price of 18,175c.
+    const ctx = { reportingCurrency: 'ZAR', quoteCurrency: 'ZAc', fxRate: 100 };
+    expect(quoteConversionFactor(ctx)).toBe(100);
+    expect(toQuoteDisplayUnits(50, ctx).value).toBeCloseTo(5000, 8);
+  });
+
+  it('applies FX then the sub-unit for every sub-unit market, not just sterling', () => {
+    // USD 20 at 18 ZAR/USD = R360 = 36,000c.
+    expect(
+      quoteConversionFactor({ reportingCurrency: 'USD', quoteCurrency: 'ZAc', fxRate: 18 })
+    ).toBeCloseTo(1800, 8);
+    // USD 20 at 3.7 ILS/USD = 74 shekels = 7,400 agorot.
+    expect(
+      quoteConversionFactor({ reportingCurrency: 'USD', quoteCurrency: 'ILA', fxRate: 3.7 })
+    ).toBeCloseTo(370, 8);
   });
 });
 

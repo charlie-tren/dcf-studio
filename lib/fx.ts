@@ -1,4 +1,4 @@
-import { QUOTE_SUBUNIT_DIVISOR } from './markets';
+import { QUOTE_SUBUNIT, QUOTE_SUBUNIT_DIVISOR } from './markets';
 
 export type FxContext = {
   reportingCurrency: string;
@@ -8,9 +8,13 @@ export type FxContext = {
   fxRate: number;
 };
 
-/** The major currency behind a possibly-sub-unit quote code. GBp -> GBP. */
+/**
+ * The major currency behind a possibly-sub-unit quote code: GBp -> GBP,
+ * ZAc -> ZAR, ILA -> ILS. Read from the table rather than upper-cased, which
+ * only ever worked for sterling.
+ */
 export function majorCurrency(quoteCurrency: string): string {
-  return quoteCurrency in QUOTE_SUBUNIT_DIVISOR ? quoteCurrency.toUpperCase() : quoteCurrency;
+  return QUOTE_SUBUNIT[quoteCurrency]?.major ?? quoteCurrency;
 }
 
 /**
