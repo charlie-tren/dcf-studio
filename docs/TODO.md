@@ -39,7 +39,7 @@
     the market is asking for something the business has never done.
   - **Stress grid**: shock each implied driver and show the price that falls out.
 
-- [ ] **A blocked perpetuity still prints a headline number.** Toyota (7203.T) has a WACC
+- [x] **A blocked perpetuity still prints a headline number** - DONE 26/08/2026. Toyota (7203.T) has a WACC
   of 2.38% against 2.50% terminal growth, so the perpetuity cannot converge. The engine
   does the right thing internally - terminal value floors to zero, and an error flag says
   why - but what the reader then sees is "Value per share (3,027.73), implied upside
@@ -50,11 +50,25 @@
   "no perpetuity value at this WACC" in place of the number, or leave it and rely on the
   flag. Found 26/08/2026 while sweeping five tickers through the Excel export.
 
-- [ ] **Loss-makers invert the sign on the terminal reinvestment row.** Mesoblast shows
+  **Resolved without a new design call.** `TerminalComparison` had already chosen the
+  answer - print the refusal in place of the number - and the headline, the value bars
+  and the workbook simply never applied it. The headline now reads "No perpetuity value"
+  and drops the upside block; the bars drop the perpetuity row; the Valuation sheet
+  carries a warning beside its heading, written as a formula so that fixing the WACC in
+  Excel clears it (verified over COM).
+
+- [x] **Loss-makers invert the sign on the terminal reinvestment row** - DONE 26/08/2026. Mesoblast shows
   "Less reinvestment to fund terminal growth 56.6" as a positive, because NOPAT is negative
   and the row is `-NOPAT x rate`. It does not propagate - capitalised cashflow is floored
   at zero - so this is cosmetic, but a "Less" row that adds reads as an error. Small.
   Found 26/08/2026.
+
+  **Fixed as the real thing rather than a relabel**: the charge is floored at zero,
+  because a business cannot fund growth out of a loss. It moves no published number in
+  the case observed, since capitalised cashflow was already floored, but it does move one
+  wherever maintenance cashflow is positive on negative NOPAT, and it moves it the
+  conservative way. Floored in the engine AND in the sheet formula - the cached result
+  alone would have looked right while Excel recalculated the floor away on open.
 
 ## Post-v1
 
