@@ -50,6 +50,23 @@ npx tsx scripts/inspect-valuations.ts
 npx tsx scripts/check-rba-live.ts
 ```
 
+After anything in `lib/workbook.ts`, run the recalculation check as well. It opens each
+exported workbook in Excel, forces a full rebuild, and compares what Excel computes against
+the result the engine cached in the file. That is the only check that can see a sheet
+formula saying something different from the engine, and it has caught that twice - the FX
+conversion cell and the terminal reinvestment floor. Both times the cached result was
+right, so every test reading the cache passed, and `fullCalcOnLoad` then replaced the right
+number with the wrong one the moment a reader opened the file. It needs Excel, so it cannot
+live in the vitest suite.
+
+```bash
+npx next dev -p 3120
+```
+
+```bash
+powershell -NoProfile -File scripts/recalc-check.ps1 -Port 3120
+```
+
 ## Design and plan
 
 - `docs/superpowers/specs/2026-07-30-dcf-studio-design.md`

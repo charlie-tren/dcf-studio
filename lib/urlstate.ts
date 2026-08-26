@@ -40,9 +40,10 @@ export function encodeState(state: UrlState): string {
   return p.toString();
 }
 
-function numberArray(raw: string | null): number[] | undefined {
+function numberArray(raw: string | null, expectedLength: number): number[] | undefined {
   if (!raw) return undefined;
   const parts = raw.split('|').map(Number);
+  if (parts.length !== expectedLength) return undefined;
   return parts.every((n) => Number.isFinite(n)) ? parts : undefined;
 }
 
@@ -65,9 +66,16 @@ export function decodeState(query: string): UrlState {
   const tcx = p.get('tcx');
   if (tcx === '0' || tcx === '1') overrides.terminalCapexEqualsDA = tcx === '1';
 
-  const g = numberArray(p.get('g'));
+  // Length has to match the horizon or the engine asserts, and every other
+  // malformed parameter here is dropped rather than thrown on. Two ways to reach
+  // a mismatch without hand-editing anything: share a link carrying a 5-entry
+  // path and toggle it to a 10-year forecast, which is one click and keeps every
+  // existing parameter, or truncate a URL. Both used to reach the reader as
+  // "revenueGrowth must have 5 entries to match horizonYears, got 1" on an error
+  // page, which is an internal invariant, not a message for anybody.
+  const g = numberArray(p.get('g'), horizonYears);
   if (g) overrides.revenueGrowth = g;
-  const m = numberArray(p.get('m'));
+  const m = numberArray(p.get('m'), horizonYears);
   if (m) overrides.ebitMargin = m;
 
   return { scenario, horizonYears, overrides };
