@@ -33,7 +33,7 @@ export function ValueBar({ v }: { v: Valuation }) {
   const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
 
   return (
-    <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
       <h2 className="text-sm font-medium tracking-wide text-[var(--text-dim)] uppercase">
         Value Per Share
       </h2>
@@ -44,8 +44,10 @@ export function ValueBar({ v }: { v: Valuation }) {
           const width = Math.max((Math.abs(r.value) / max) * 100, 1.5);
           const negative = r.value < 0;
           return (
-            <div key={r.label} className="flex items-center gap-4">
-              <span className="w-36 shrink-0 text-sm text-[var(--text-dim)]">{r.label}</span>
+            <div key={r.label} className="flex items-center gap-2 sm:gap-4">
+              <span className="w-24 shrink-0 text-xs text-[var(--text-dim)] sm:w-36 sm:text-sm">
+                {r.label}
+              </span>
               <div className="relative h-6 flex-1 overflow-hidden rounded-sm bg-[var(--bg)]">
                 <div
                   className={`h-full rounded-sm ${
@@ -59,7 +61,7 @@ export function ValueBar({ v }: { v: Valuation }) {
                 />
               </div>
               <span
-                className={`nums w-28 shrink-0 text-right text-sm font-medium ${
+                className={`nums w-20 shrink-0 text-right text-xs font-medium sm:w-28 sm:text-sm ${
                   isMarket
                     ? 'text-[var(--text)]'
                     : negative
@@ -69,7 +71,7 @@ export function ValueBar({ v }: { v: Valuation }) {
               >
                 {perShare(r.value, ccy)}
               </span>
-              <span className="nums w-20 shrink-0 text-right text-xs text-[var(--text-faint)]">
+              <span className="nums w-14 shrink-0 text-right text-[11px] text-[var(--text-faint)] sm:w-20 sm:text-xs">
                 {isMarket
                   ? ''
                   : signedPct(v.fundamentals.price > 0 ? r.value / v.fundamentals.price - 1 : 0)}
