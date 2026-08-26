@@ -5,10 +5,22 @@ export const metadata = { title: 'Methodology - DCF Studio' };
 export default function Methodology() {
   return (
     <main className="mx-auto max-w-3xl space-y-10 px-6 py-16">
-      <Link href="/" className="text-sm text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline">
-        Back to search
-      </Link>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Methodology</h1>
+      {/* Link and heading share a block so the page's space-y-10 does not strand
+          the back-link 40px above the title. Muted with a left arrow, matching the
+          header's "Other projects" link rather than shouting in the accent colour. */}
+      <div>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
+        >
+          {/* The arrow's ink sits low in its em box beside a capital: nudge it up 1px. */}
+          <span aria-hidden="true" className="relative -top-px">
+            ←
+          </span>
+          Back to search
+        </Link>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">Methodology</h1>
+      </div>
 
       <section className="space-y-3">
         <h2 className="pt-2 text-xl font-semibold text-white">The cashflow build</h2>
@@ -164,7 +176,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Statements, prices, betas, analyst estimates and FX from Yahoo Finance. Australian
           risk-free rates from the Reserve Bank of Australia (F2, capital market yields). Both are
-          free sources and neither is guaranteed accurate or current. Not affiliated with Yahoo.
+          free sources and neither is guaranteed accurate or current.
         </p>
       </section>
 

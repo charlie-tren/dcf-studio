@@ -44,7 +44,7 @@ export default function RootLayout({
             >
               Charlie Trenorden
             </a>
-            . General information, not advice. Not affiliated with Yahoo.
+            . General information, not advice.
           </div>
         </footer>
         {/* Cloudflare Web Analytics. Feeds the private stats dashboard, which runs
