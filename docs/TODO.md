@@ -39,6 +39,23 @@
     the market is asking for something the business has never done.
   - **Stress grid**: shock each implied driver and show the price that falls out.
 
+- [ ] **A blocked perpetuity still prints a headline number.** Toyota (7203.T) has a WACC
+  of 2.38% against 2.50% terminal growth, so the perpetuity cannot converge. The engine
+  does the right thing internally - terminal value floors to zero, and an error flag says
+  why - but what the reader then sees is "Value per share (3,027.73), implied upside
+  -198.62%" in bold on both the page and the Valuation tab, which looks like an answer
+  rather than a refusal. The methodology page says the calculation is "blocked rather than
+  fudged"; it is blocked, and then the blocked result is published. Charlie's call on the
+  fix: suppress the perpetuity headline and lead with the exit multiple, show an explicit
+  "no perpetuity value at this WACC" in place of the number, or leave it and rely on the
+  flag. Found 26/08/2026 while sweeping five tickers through the Excel export.
+
+- [ ] **Loss-makers invert the sign on the terminal reinvestment row.** Mesoblast shows
+  "Less reinvestment to fund terminal growth 56.6" as a positive, because NOPAT is negative
+  and the row is `-NOPAT x rate`. It does not propagate - capitalised cashflow is floored
+  at zero - so this is cosmetic, but a "Less" row that adds reads as an error. Small.
+  Found 26/08/2026.
+
 ## Post-v1
 
 - [ ] **Dividend-discount model for financials.** Banks and insurers have no meaningful
@@ -54,6 +71,14 @@
   225.44 -> 268.65. Tests recompute the sheet's own formula chain and assert it ties to the
   site across five tickers. CSV not built: the point was the live calc chain, which CSV
   cannot carry.
+
+  **Correction, 26/08/2026.** That reconciliation stopped at the reporting-currency value
+  per share, so it never touched the last two rows of the Valuation sheet, and a pence
+  quote shipped wrong for nine days: Shell showed 38.16 against 3,345.75p because the
+  conversion cell held the bare FX rate with no sub-unit multiply. Fixed, and the tests now
+  recompute the quoted value and the upside too. The lesson is the general one - a
+  reconciliation that stops one row short of the number the reader actually looks at is not
+  a reconciliation.
 - [ ] **Longer US history via SEC EDGAR `companyfacts`.** Free, keyless, official.
   **Probed 17/08/2026 - it is NOT the quick win it looks like.** The endpoint works
   (`data.sec.gov/api/xbrl/companyfacts/CIK{10-digit}.json`, needs a User-Agent header)
