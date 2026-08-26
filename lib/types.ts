@@ -31,6 +31,20 @@ export type DataQualityFlag = {
   message: string;
 };
 
+/**
+ * What a severity is called in front of a reader. Lives here rather than in the
+ * component because the Excel export shows the same flags, and it used to print
+ * the raw enum: "ERROR: This is a financial" reads as a crash, not a caveat.
+ */
+export const FLAG_LABEL: Record<DataQualityFlag['severity'], string> = {
+  error: 'Wrong tool',
+  warn: 'Adjusted',
+  info: 'Note',
+};
+
+/** Most serious first. Shared so the page and the workbook order them alike. */
+export const FLAG_ORDER: DataQualityFlag['severity'][] = ['error', 'warn', 'info'];
+
 /** One historical fiscal year, fully normalised. Signs are canonical (see lib/normalise.ts). */
 export type FiscalYear = {
   periodEnd: string;

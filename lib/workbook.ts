@@ -1,4 +1,6 @@
 import ExcelJS from 'exceljs';
+import { majorCurrency, quoteConversionFactor } from './fx';
+import { FLAG_LABEL, FLAG_ORDER } from './types';
 import type { Valuation } from './valuation';
 
 /**
@@ -15,12 +17,20 @@ import type { Valuation } from './valuation';
  * site's arithmetic independently. Here the workbook IS the check.
  */
 
+/** Two commas scale by a million, so every MONEY cell reads in millions. Every
+ *  heading that sits above one has to say so, or 3,651,215.0 reads as dollars. */
 const MONEY = '#,##0.0,,;[Red](#,##0.0,,)';
 const RATE = '0.00%';
 const PER_SHARE = '#,##0.00;[Red](#,##0.00)';
 const MULTIPLE = '0.0"x"';
+const GREY = 'FF666666';
 
 type Sheet = ExcelJS.Worksheet;
+
+/** "USD m" - the unit label that belongs on anything formatted with MONEY. */
+function millions(currency: string): string {
+  return `${currency} m`;
+}
 
 function label(sheet: Sheet, row: number, text: string, indent = 0): ExcelJS.Cell {
   const cell = sheet.getCell(`A${row}`);
@@ -29,10 +39,38 @@ function label(sheet: Sheet, row: number, text: string, indent = 0): ExcelJS.Cel
   return cell;
 }
 
-function sectionHeading(sheet: Sheet, row: number, text: string): void {
+function note(cell: ExcelJS.Cell, text: string): void {
+  cell.value = text;
+  cell.font = { size: 9, color: { argb: GREY } };
+  // A one-space indent keeps the note off the right-aligned figure beside it.
+  cell.alignment = { indent: 1 };
+}
+
+/**
+ * A heading rule that stops at column A reads as a truncated line, because the
+ * figures it introduces sit two columns over. Carry the border across the block.
+ */
+function sectionHeading(sheet: Sheet, row: number, text: string, lastCol = 'C'): void {
   const cell = label(sheet, row, text);
   cell.font = { bold: true, size: 11 };
-  cell.border = { bottom: { style: 'thin' } };
+  for (const c of columnsTo(lastCol)) {
+    sheet.getCell(`${c}${row}`).border = { bottom: { style: 'thin' } };
+  }
+}
+
+/** ['A', 'B', ... last]. Single-letter columns only, which is all this file uses. */
+function columnsTo(last: string): string[] {
+  const out: string[] = [];
+  for (let c = 'A'.charCodeAt(0); c <= last.charCodeAt(0); c++) out.push(String.fromCharCode(c));
+  return out;
+}
+
+/** Rules a header row underneath, so a table reads as a table. */
+function underline(sheet: Sheet, row: number, cols: string[]): void {
+  for (const c of cols) {
+    const cell = sheet.getCell(`${c}${row}`);
+    cell.border = { ...cell.border, bottom: { style: 'thin' } };
+  }
 }
 
 /** Inputs are blue-on-pale, the convention every modeller already reads. */
@@ -86,6 +124,18 @@ function col(i: number): string {
   return String.fromCharCode('B'.charCodeAt(0) + i);
 }
 
+/**
+ * Gridlines off on every sheet. They are the difference between a spreadsheet
+ * and a model: the borders here are deliberate and gridlines drown them.
+ */
+function present(sheet: Sheet, freezeFirstColumn = false): void {
+  sheet.views = [
+    freezeFirstColumn
+      ? { state: 'frozen', xSplit: 1, showGridLines: false }
+      : { showGridLines: false },
+  ];
+}
+
 export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'DCF Studio';
@@ -100,17 +150,20 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
 
   // ---------------------------------------------------------------- Assumptions
   const a = wb.addWorksheet('Assumptions');
+  present(a);
   a.getColumn('A').width = 40;
   a.getColumn('B').width = 16;
   a.getColumn('C').width = 52;
 
+  const scenarioName = v.scenario.charAt(0).toUpperCase() + v.scenario.slice(1);
+
   a.getCell('A1').value = `${v.fundamentals.name} (${v.fundamentals.ticker})`;
   a.getCell('A1').font = { bold: true, size: 14 };
-  a.getCell('A2').value = `DCF Studio - ${v.scenario} case${v.modified ? ', edited' : ''}`;
-  a.getCell('A2').font = { color: { argb: 'FF666666' } };
+  a.getCell('A2').value = `DCF Studio - ${scenarioName} case${v.modified ? ', edited' : ''}`;
+  a.getCell('A2').font = { color: { argb: GREY } };
   a.getCell('A3').value =
-    'Shaded blue cells are inputs. Every other figure is a formula - change an input and the model reprices.';
-  a.getCell('A3').font = { italic: true, color: { argb: 'FF666666' }, size: 9 };
+    `Blue figures on a cream fill are inputs. Every other figure is a formula - change an input and the model reprices. Currency figures are ${ccy} millions unless the row says otherwise.`;
+  a.getCell('A3').font = { italic: true, color: { argb: GREY }, size: 9 };
 
   sectionHeading(a, 5, 'Drivers');
   const rows = {
@@ -151,10 +204,12 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     v.dcf.gordon.terminal.steadyState?.roic ?? v.wacc.wacc,
     RATE
   );
-  a.getCell(`C${rows.roic}`).value = v.dcf.gordon.terminal.steadyState?.roicFromAccounts
-    ? 'From reported invested capital'
-    : 'Floored at WACC (reported ROIC below cost of capital)';
-  a.getCell(`C${rows.roic}`).font = { size: 9, color: { argb: 'FF666666' } };
+  note(
+    a.getCell(`C${rows.roic}`),
+    v.dcf.gordon.terminal.steadyState?.roicFromAccounts
+      ? 'From reported invested capital'
+      : 'Floored at WACC (reported ROIC below cost of capital)'
+  );
 
   sectionHeading(a, 16, 'Discount rate');
   const w = {
@@ -174,8 +229,8 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   label(a, w.beta, 'Beta');
   label(a, w.coe, 'Cost of equity');
   label(a, w.cod, 'Cost of debt');
-  label(a, w.mcap, `Market capitalisation (${ccy})`);
-  label(a, w.debt, `Total debt (${ccy})`);
+  label(a, w.mcap, `Market capitalisation (${millions(ccy)})`);
+  label(a, w.debt, `Total debt (${millions(ccy)})`);
   label(a, w.equityWeight, 'Equity weight');
   label(a, w.debtWeight, 'Debt weight');
   label(a, w.wacc, 'WACC');
@@ -197,19 +252,19 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     v.wacc.wacc
   );
   a.getCell(`B${w.wacc}`).font = { bold: true };
-  a.getCell(`C${w.rf}`).value = v.wacc.riskFreeSource;
-  a.getCell(`C${w.cod}`).value = v.wacc.costOfDebtSource;
-  a.getCell(`C${w.beta}`).value = v.wacc.betaClamped
-    ? `Clamped from a reported ${v.wacc.rawBeta?.toFixed(3)}`
-    : 'As reported';
-  for (const r of [w.rf, w.cod, w.beta]) {
-    a.getCell(`C${r}`).font = { size: 9, color: { argb: 'FF666666' } };
-  }
+  note(a.getCell(`C${w.rf}`), v.wacc.riskFreeSource);
+  note(a.getCell(`C${w.cod}`), v.wacc.costOfDebtSource);
+  note(
+    a.getCell(`C${w.beta}`),
+    v.wacc.betaClamped
+      ? `Clamped from a reported ${v.wacc.rawBeta?.toFixed(3)}`
+      : 'As reported'
+  );
 
   sectionHeading(a, 28, 'Base year');
   const base = { revenue: 29, netDebt: 30, shares: 31, midYear: 32 };
-  label(a, base.revenue, `Revenue, last reported year (${ccy})`);
-  label(a, base.netDebt, `Net debt (${ccy})`);
+  label(a, base.revenue, `Revenue, last reported year (${millions(ccy)})`);
+  label(a, base.netDebt, `Net debt (${millions(ccy)})`);
   label(a, base.shares, 'Diluted shares');
   label(a, base.midYear, 'Mid-year discounting (1 = yes, 0 = no)');
   const latest = v.fundamentals.years[0];
@@ -217,18 +272,18 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   inputCell(a, `B${base.netDebt}`, latest.totalDebt.value - latest.cash.value, MONEY);
   inputCell(a, `B${base.shares}`, latest.shares.value, '#,##0');
   inputCell(a, `B${base.midYear}`, v.assumptions.midYearConvention ? 1 : 0, '0');
-  a.getCell(`C${base.revenue}`).value = `Fiscal year ended ${latest.periodEnd}`;
-  a.getCell(`C${base.revenue}`).font = { size: 9, color: { argb: 'FF666666' } };
+  note(a.getCell(`C${base.revenue}`), `Fiscal year ended ${latest.periodEnd}`);
 
   // ------------------------------------------------------------------ Forecast
   const f = wb.addWorksheet('Forecast');
+  present(f, true);
   f.getColumn('A').width = 42;
   for (let i = 0; i < n; i++) f.getColumn(col(i)).width = 15;
 
-  f.getCell('A1').value = `Forecast cashflows (${ccy})`;
+  f.getCell('A1').value = `Forecast cashflows (${millions(ccy)})`;
   f.getCell('A1').font = { bold: true, size: 12 };
   f.getCell('A2').value = 'Every figure below is a formula. Edit the drivers on Assumptions.';
-  f.getCell('A2').font = { italic: true, size: 9, color: { argb: 'FF666666' } };
+  f.getCell('A2').font = { italic: true, size: 9, color: { argb: GREY } };
 
   const r = {
     header: 4,
@@ -251,8 +306,10 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     c.value = years[i];
     c.font = { bold: true };
     c.alignment = { horizontal: 'right' };
-    c.border = { bottom: { style: 'thin' } };
   }
+  // Across the label column too: a rule that starts under the first year reads
+  // as a stray line rather than as the head of the table.
+  underline(f, r.header, ['A', ...Array.from({ length: n }, (_, i) => col(i))]);
 
   label(f, r.growth, 'Revenue growth');
   label(f, r.revenue, 'Revenue');
@@ -330,17 +387,27 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
 
   const lastCol = col(n - 1);
   label(f, 17, 'Present value of the explicit forecast').font = { bold: true };
-  formulaCell(f, `B17`, `SUM(B${r.pv}:${lastCol}${r.pv})`, MONEY, v.dcf.pvExplicit).font = {
-    bold: true,
-  };
+  const pvTotal = formulaCell(
+    f,
+    `B17`,
+    `SUM(B${r.pv}:${lastCol}${r.pv})`,
+    MONEY,
+    v.dcf.pvExplicit
+  );
+  pvTotal.font = { bold: true };
+  // A total sitting bare under the FY1 column reads as an FY1 figure. The rule
+  // says it is the sum of the row above, not another year.
+  pvTotal.border = { top: { style: 'thin' }, bottom: { style: 'double' } };
+  f.getCell('A17').border = { top: { style: 'thin' } };
 
   // ----------------------------------------------------------------- Valuation
   const val = wb.addWorksheet('Valuation');
+  present(val);
   val.getColumn('A').width = 46;
   val.getColumn('B').width = 18;
   val.getColumn('C').width = 46;
 
-  val.getCell('A1').value = `Valuation (${ccy})`;
+  val.getCell('A1').value = `Valuation (${millions(ccy)}, except per share)`;
   val.getCell('A1').font = { bold: true, size: 12 };
 
   const ss = v.dcf.gordon.terminal.steadyState;
@@ -361,7 +428,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     perShare: 14,
   };
   label(val, t.finalFcff, 'Final year free cashflow');
-  label(val, t.maintenance, 'Capex reset to depreciation');
+  label(val, t.maintenance, 'Free cashflow with capex at depreciation');
   label(val, t.reinvestRate, 'Reinvestment rate (g / ROIC)');
   label(val, t.reinvest, 'Less reinvestment to fund terminal growth');
   label(val, t.capitalised, 'Cashflow capitalised');
@@ -437,11 +504,15 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   val.getCell(`A${t.perShare}`).font = { bold: true };
 
   sectionHeading(val, 16, 'Terminal value - exit multiple');
-  const x = { ebitda: 17, tv: 18, tvPv: 19, ev: 20, equity: 21, perShare: 22 };
+  // Same bridge as the perpetuity block, line for line. It used to jump from
+  // enterprise value straight to equity value, so the one method a reader would
+  // check against the other hid the step where they could differ.
+  const x = { ebitda: 17, tv: 18, tvPv: 19, ev: 20, netDebt: 21, equity: 22, perShare: 23 };
   label(val, x.ebitda, 'Final year EBITDA');
   label(val, x.tv, 'Terminal value, undiscounted');
   label(val, x.tvPv, 'Terminal value, discounted');
   label(val, x.ev, 'Enterprise value');
+  label(val, x.netDebt, 'Less net debt');
   label(val, x.equity, 'Equity value');
   label(val, x.perShare, 'Value per share');
   formulaCell(
@@ -468,8 +539,15 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   formulaCell(val, `B${x.ev}`, `Forecast!B17+B${x.tvPv}`, MONEY, v.dcf.exitMultiple.enterpriseValue);
   formulaCell(
     val,
+    `B${x.netDebt}`,
+    `-Assumptions!B${base.netDebt}`,
+    MONEY,
+    -(v.dcf.exitMultiple.enterpriseValue - v.dcf.exitMultiple.equityValue)
+  );
+  formulaCell(
+    val,
     `B${x.equity}`,
-    `B${x.ev}-Assumptions!B${base.netDebt}`,
+    `B${x.ev}+B${x.netDebt}`,
     MONEY,
     v.dcf.exitMultiple.equityValue
   );
@@ -481,42 +559,82 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     v.dcf.exitMultiple.valuePerShare
   );
   val.getCell(`B${x.perShare}`).font = { bold: true };
+  val.getCell(`A${x.perShare}`).font = { bold: true };
 
-  sectionHeading(val, 24, 'Against the market');
-  label(val, 25, `Market price (${v.fundamentals.quoteCurrency})`);
-  label(val, 26, 'FX, reporting to quote currency');
-  label(val, 27, `Value per share (${v.fundamentals.quoteCurrency})`);
-  label(val, 28, 'Implied upside');
-  inputCell(val, 'B25', v.fundamentals.price, PER_SHARE);
-  inputCell(val, 'B26', v.fxRate, '0.0000');
-  formulaCell(val, 'B27', `B${t.perShare}*B26`, PER_SHARE, v.valuePerShareQuoted);
-  formulaCell(val, 'B28', `B27/B25-1`, RATE, v.upside);
-  val.getCell('B28').font = { bold: true };
+  const quote = v.fundamentals.quoteCurrency;
+  const fxContext = {
+    reportingCurrency: ccy,
+    quoteCurrency: quote,
+    fxRate: v.fxRate,
+  };
+  // One factor, not a bare FX rate: a pence quote needs the sub-unit multiply as
+  // well, and the sheet used to omit it. The engine and the sheet now read the
+  // same function, so they cannot disagree again.
+  const conversion = quoteConversionFactor(fxContext);
+  const subUnit = majorCurrency(quote) !== quote;
+
+  sectionHeading(val, 25, 'Against the market');
+  const m = { price: 26, conversion: 27, perShare: 28, upside: 29 };
+  label(val, m.price, `Market price (${quote})`);
+  label(val, m.conversion, `Conversion, ${ccy} to ${quote}`);
+  label(val, m.perShare, `Value per share (${quote})`);
+  label(val, m.upside, 'Implied upside');
+  inputCell(val, `B${m.price}`, v.fundamentals.price, PER_SHARE);
+  inputCell(val, `B${m.conversion}`, conversion, '0.0000');
+  note(
+    val.getCell(`C${m.conversion}`),
+    majorCurrency(quote) === ccy && !subUnit
+      ? 'Same currency, no conversion'
+      : [
+          majorCurrency(quote) === ccy
+            ? null
+            : `${ccy}/${majorCurrency(quote)} at ${v.fxRate.toFixed(4)}`,
+          subUnit ? `then x100, because ${quote} is a sub-unit of ${majorCurrency(quote)}` : null,
+        ]
+          .filter(Boolean)
+          .join(', ')
+  );
+  formulaCell(
+    val,
+    `B${m.perShare}`,
+    `B${t.perShare}*B${m.conversion}`,
+    PER_SHARE,
+    v.valuePerShareQuoted
+  );
+  formulaCell(val, `B${m.upside}`, `B${m.perShare}/B${m.price}-1`, RATE, v.upside);
+  val.getCell(`B${m.upside}`).font = { bold: true };
+  val.getCell(`A${m.upside}`).font = { bold: true };
 
   // --------------------------------------------------------------- Sensitivity
   const s = wb.addWorksheet('Sensitivity');
-  s.getColumn('A').width = 18;
+  present(s, true);
+  s.getColumn('A').width = 14;
   s.getCell('A1').value = `Value per share (${ccy}) by WACC and terminal growth`;
   s.getCell('A1').font = { bold: true, size: 12 };
   s.getCell('A2').value =
-    'Static grid: computed by DCF Studio, not linked to the sheets above. A live data table needs Excel to build it (Data > What-If > Data Table).';
-  s.getCell('A2').font = { italic: true, size: 9, color: { argb: 'FF666666' } };
+    'WACC down the side, terminal growth across the top. Static grid: computed by DCF Studio, not linked to the sheets above. A live data table needs Excel to build it (Data > What-If > Data Table).';
+  s.getCell('A2').font = { italic: true, size: 9, color: { argb: GREY } };
 
-  s.getCell('A4').value = 'WACC \\ growth';
+  s.getCell('A4').value = 'WACC';
   s.getCell('A4').font = { bold: true };
   v.sensitivity.growthValues.forEach((g, j) => {
     const c = s.getCell(`${col(j)}4`);
     c.value = g;
     c.numFmt = RATE;
     c.font = { bold: true };
+    c.alignment = { horizontal: 'right' };
     s.getColumn(col(j)).width = 13;
   });
+  underline(s, 4, ['A', ...v.sensitivity.growthValues.map((_, j) => col(j))]);
   v.sensitivity.waccValues.forEach((wv, i) => {
     const row = 5 + i;
     const rc = s.getCell(`A${row}`);
     rc.value = wv;
     rc.numFmt = RATE;
     rc.font = { bold: true };
+    // Rules the stub column off from the grid, so a reader never loses which
+    // WACC row a figure belongs to.
+    rc.border = { right: { style: 'thin' } };
     v.sensitivity.cells[i].forEach((cellValue, j) => {
       const c = s.getCell(`${col(j)}${row}`);
       c.value = cellValue === null ? 'n/a' : cellValue;
@@ -535,22 +653,32 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
 
   // -------------------------------------------------------------------- Source
   const src = wb.addWorksheet('Source data');
+  present(src, true);
   src.getColumn('A').width = 40;
-  src.getCell('A1').value = 'Reported history and provenance';
+  src.getCell('A1').value = `Reported history and provenance (${millions(ccy)}, except shares)`;
   src.getCell('A1').font = { bold: true, size: 12 };
   src.getCell('A2').value =
     'What the model was built from. "derived" means the figure was not reported and was computed - the note says how.';
-  src.getCell('A2').font = { italic: true, size: 9, color: { argb: 'FF666666' } };
+  src.getCell('A2').font = { italic: true, size: 9, color: { argb: GREY } };
 
   const hist = v.fundamentals.years;
+  const fieldCol = col(hist.length);
   src.getCell('A4').value = 'Fiscal year end';
   src.getCell('A4').font = { bold: true };
   hist.forEach((y, i) => {
     const c = src.getCell(`${col(i)}4`);
     c.value = y.periodEnd;
     c.font = { bold: true };
+    // The dates are strings and the figures under them are numbers, so without
+    // this the header sat left while its own column sat right.
+    c.alignment = { horizontal: 'right' };
     src.getColumn(col(i)).width = 17;
   });
+  const fieldHeader = src.getCell(`${fieldCol}4`);
+  fieldHeader.value = 'Yahoo field, latest year';
+  fieldHeader.font = { bold: true, size: 9 };
+  fieldHeader.alignment = { indent: 1 };
+  underline(src, 4, ['A', ...hist.map((_, i) => col(i)), fieldCol]);
 
   const lines: [string, (y: (typeof hist)[number]) => { value: number; note: string }][] = [
     ['Revenue', (y) => ({ value: y.revenue.value, note: y.revenue.provenance.sourceField })],
@@ -571,36 +699,47 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
       c.value = value;
       c.numFmt = name === 'Diluted shares' ? '#,##0' : MONEY;
     });
-    const noteCell = src.getCell(`${col(hist.length)}${row}`);
-    noteCell.value = pick(hist[0]).note;
-    noteCell.font = { size: 9, color: { argb: 'FF666666' } };
+    note(src.getCell(`${fieldCol}${row}`), pick(hist[0]).note);
   });
-  src.getColumn(col(hist.length)).width = 44;
+  src.getColumn(fieldCol).width = 44;
+
+  /**
+   * A merged cell does not auto-fit, so a fixed height silently guillotines the
+   * text: CBA's "a DCF will misprice it" warning shipped cut off mid-sentence,
+   * which is the one note a reader most needs to finish. Size the row from the
+   * text instead, erring long - blank space costs nothing, a lost caveat does.
+   */
+  const noteWidth = 40 + hist.length * 17 + 44;
+  function wrappedNote(row: number, text: string): void {
+    const c = src.getCell(`A${row}`);
+    c.value = text;
+    c.alignment = { wrapText: true, vertical: 'top' };
+    src.mergeCells(`A${row}:${fieldCol}${row}`);
+    const perLine = Math.max(20, Math.floor(noteWidth * 0.9));
+    src.getRow(row).height = Math.ceil(text.length / perLine) * 16 + 6;
+  }
 
   let noteRow = 5 + lines.length + 2;
   src.getCell(`A${noteRow}`).value = 'Model notes';
   src.getCell(`A${noteRow}`).font = { bold: true };
   noteRow++;
-  for (const flag of [...v.flags]) {
-    const c = src.getCell(`A${noteRow}`);
-    c.value = `${flag.severity.toUpperCase()}: ${flag.message}`;
-    c.alignment = { wrapText: true, vertical: 'top' };
-    src.getRow(noteRow).height = 30;
-    src.mergeCells(`A${noteRow}:${col(hist.length)}${noteRow}`);
+  const flags = [...v.flags].sort(
+    (x1, x2) => FLAG_ORDER.indexOf(x1.severity) - FLAG_ORDER.indexOf(x2.severity)
+  );
+  for (const flag of flags) {
+    // FLAG_LABEL, not the raw enum: "ERROR: This is a financial" read as a crash
+    // rather than as the caveat it is, and the page has always said "Wrong tool".
+    wrappedNote(noteRow, `${FLAG_LABEL[flag.severity]}: ${flag.message}`);
     noteRow++;
   }
-  for (const note of v.notes) {
-    const c = src.getCell(`A${noteRow}`);
-    c.value = note;
-    c.alignment = { wrapText: true, vertical: 'top' };
-    src.getRow(noteRow).height = 30;
-    src.mergeCells(`A${noteRow}:${col(hist.length)}${noteRow}`);
+  for (const line of v.notes) {
+    wrappedNote(noteRow, line);
     noteRow++;
   }
   noteRow++;
   src.getCell(`A${noteRow}`).value =
     'Data: Yahoo Finance; Australian risk-free rates from the RBA. General information, not advice.';
-  src.getCell(`A${noteRow}`).font = { size: 9, color: { argb: 'FF666666' } };
+  src.getCell(`A${noteRow}`).font = { size: 9, color: { argb: GREY } };
 
   return wb.xlsx.writeBuffer();
 }

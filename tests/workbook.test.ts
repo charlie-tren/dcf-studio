@@ -114,7 +114,7 @@ describe('workbook renders without a recalculation', () => {
       v.dcf.gordon.valuePerShare,
       6
     );
-    expect(cached('Valuation', 'B22'), 'exit per share').toBeCloseTo(
+    expect(cached('Valuation', 'B23'), 'exit per share').toBeCloseTo(
       v.dcf.exitMultiple.valuePerShare,
       6
     );
@@ -278,9 +278,61 @@ describe('workbook reconciles to the site', () => {
     // BHP reports USD and trades AUD. The sheet must apply the FX itself.
     const v = await valuationFor('BHP.AX', 1.45);
     const wb = await open(v);
-    expect(num(wb, 'Valuation', 'B26')).toBeCloseTo(1.45, 8);
-    expect(formula(wb, 'Valuation', 'B27')).toContain('B26');
-    expect(formula(wb, 'Valuation', 'B28')).toContain('B25');
+    expect(num(wb, 'Valuation', 'B27')).toBeCloseTo(1.45, 8);
+    expect(formula(wb, 'Valuation', 'B28')).toContain('B27');
+    expect(formula(wb, 'Valuation', 'B29')).toContain('B26');
+  });
+
+  /**
+   * The bug this guards: the conversion cell held the bare FX rate, so a market
+   * quoting in a sub-unit lost the x100. Shell reports USD and quotes pence, and
+   * the workbook valued it at 38.16 against a price of 3,345.75p - a 99%
+   * downside on a name the page had at +14%. fullCalcOnLoad meant Excel
+   * recalculated the correct cached figure away on open, so the file looked
+   * right until you opened it.
+   *
+   * Recomputes the last two rows from the sheet's own inputs, which is the only
+   * check that would have caught it: every other assertion stops at the
+   * reporting-currency value per share.
+   */
+  it.each(['MSFT', 'BHP.AX', 'SHEL.L'])(
+    '%s - the sheet reaches the quoted value per share and upside',
+    async (ticker) => {
+      const v = await valuationFor(ticker, 1.45);
+      const wb = await open(v);
+      const perShareReporting = (
+        wb.getWorksheet('Valuation')!.getCell('B14').value as { result: number }
+      ).result;
+      const conversion = num(wb, 'Valuation', 'B27');
+      const price = num(wb, 'Valuation', 'B26');
+
+      expect(perShareReporting * conversion, 'value per share in quoted units').toBeCloseTo(
+        v.valuePerShareQuoted,
+        6
+      );
+      expect((perShareReporting * conversion) / price - 1, 'implied upside').toBeCloseTo(
+        v.upside,
+        8
+      );
+    }
+  );
+
+  it('spells out a sub-unit conversion rather than showing a bare FX rate', async () => {
+    const v = await valuationFor('SHEL.L', 0.75);
+    const wb = await open(v);
+    // 0.75 USD/GBP, then x100 into pence.
+    expect(num(wb, 'Valuation', 'B27')).toBeCloseTo(75, 8);
+    expect(wb.getWorksheet('Valuation')!.getCell('A27').value).toBe('Conversion, USD to GBp');
+    expect(String(wb.getWorksheet('Valuation')!.getCell('C27').value)).toMatch(/sub-unit/);
+  });
+
+  it('bridges enterprise to equity value on both terminal methods', async () => {
+    // The exit-multiple block used to jump straight from EV to equity, hiding
+    // the one step where the two methods could differ.
+    const v = await valuationFor('MSFT');
+    const wb = await open(v);
+    expect(wb.getWorksheet('Valuation')!.getCell('A21').value).toBe('Less net debt');
+    expect(formula(wb, 'Valuation', 'B22')).toBe('B20+B21');
   });
 });
 

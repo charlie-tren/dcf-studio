@@ -27,14 +27,28 @@ export function toQuoteDisplayUnits(
   valueInReportingCurrency: number,
   ctx: FxContext
 ): { value: number; converted: boolean } {
+  const sameCurrency = majorCurrency(ctx.quoteCurrency) === ctx.reportingCurrency;
+  return {
+    value: valueInReportingCurrency * quoteConversionFactor(ctx),
+    converted: !sameCurrency,
+  };
+}
+
+/**
+ * The single multiplier that takes a reporting-currency figure into quoted
+ * units: the FX rate where the currencies differ, times the sub-unit factor
+ * where the market quotes in pence or cents.
+ *
+ * Exported because the Excel export has to put this on the sheet as one cell,
+ * and it used to write the bare FX rate. Shell reports USD and quotes pence, so
+ * the workbook valued it at 38.16 against a price of 3,345.75p - a 99% downside
+ * on a name the site had at +14%. One definition, two readers.
+ */
+export function quoteConversionFactor(ctx: FxContext): number {
   const divisor = QUOTE_SUBUNIT_DIVISOR[ctx.quoteCurrency];
   const sameCurrency = majorCurrency(ctx.quoteCurrency) === ctx.reportingCurrency;
   const rate = sameCurrency ? 1 : ctx.fxRate;
-  const inMajorUnits = valueInReportingCurrency * rate;
-  return {
-    value: divisor ? inMajorUnits * divisor : inMajorUnits,
-    converted: !sameCurrency,
-  };
+  return divisor ? rate * divisor : rate;
 }
 
 /** A quoted price expressed in major units, for like-for-like comparison. */
