@@ -173,14 +173,31 @@ describe('workbook is live, not pasted', () => {
 
 describe('workbook reconciles to the site', () => {
   /**
-   * Recomputes the workbook's OWN formula chain in TypeScript, from the input
-   * cells only, and checks it lands on the value the site displays. This is the
-   * test that makes the export trustworthy: if the sheet's arithmetic disagreed
-   * with the engine, a reader would get a different answer in Excel and have no
-   * way to know which was right.
+   * Recomputes the terminal and discount chain in TypeScript from the sheet's
+   * INPUT cells, and checks it lands on the value the site displays.
+   *
+   * Read what that does and does not cover, because the old comment here
+   * claimed it was "the test that makes the export trustworthy" and it is not.
+   * It re-types the chain by hand; it never reads a derived formula out of the
+   * workbook. So it catches an engine that drifts from the chain we intend, and
+   * it is blind to the sheet actually shipping a different formula - which is
+   * the failure that has now happened twice, on the FX conversion cell and on
+   * the terminal reinvestment floor. Both were verified: with both sheet
+   * formulas reverted to their broken form, every case below still passes.
+   *
+   * The tests that do cover the file are the ones that assert on
+   * `formula(...)`, plus the cached-result sweep above. When you add arithmetic
+   * to a sheet, add an assertion there, not only here. Mirror any floor or
+   * guard in this harness too, or it silently documents the wrong chain: the
+   * two Math.max calls below were missing, which is how the loss-maker case
+   * came to look reconciled.
    */
-  async function recomputeFromInputs(ticker: string, fxRate = 1) {
-    const v = await valuationFor(ticker, fxRate);
+  async function recomputeFromInputs(
+    ticker: string,
+    fxRate = 1,
+    overrides: Parameters<typeof buildValuation>[1]['overrides'] = undefined
+  ) {
+    const v = await valuationFor(ticker, fxRate, overrides);
     const wb = await open(v);
     const A = (ref: string) => num(wb, 'Assumptions', ref);
 
@@ -243,11 +260,17 @@ describe('workbook reconciles to the site', () => {
       finalEbit = ebit;
     }
 
-    // The terminal chain as the Valuation sheet computes it.
+    // The terminal chain as the Valuation sheet computes it. Both floors are
+    // mirrored deliberately: this harness omitted them, which is precisely why
+    // a loss-maker's reinvestment credit and a blocked perpetuity both got past
+    // a suite that claimed to reconcile the sheet to the engine.
     const maintenance = finalFcff + finalCapex - finalDa;
     const reinvestRate = Math.min(terminalGrowth / Math.max(roic, wacc), 0.9);
-    const capitalised = Math.max(maintenance - finalNopat * reinvestRate, 0);
-    const tv = (capitalised * (1 + terminalGrowth)) / (wacc - terminalGrowth);
+    const capitalised = Math.max(maintenance - Math.max(finalNopat, 0) * reinvestRate, 0);
+    const tv =
+      terminalGrowth >= wacc
+        ? 0
+        : (capitalised * (1 + terminalGrowth)) / (wacc - terminalGrowth);
     const tvPv = tv / (1 + wacc) ** (n - 0.5 * midYear);
     const ev = pvExplicit + tvPv;
     const perShare = (ev - netDebt) / shares;
@@ -260,7 +283,10 @@ describe('workbook reconciles to the site', () => {
     return { v, wacc, pvExplicit, perShare, exitPerShare };
   }
 
-  it.each(['MSFT', 'BHP.AX', 'ARB.AX', 'SGP.AX', 'SHEL.L'])(
+  // MSB.AX is the loss-maker and it was missing from this list, which is the
+  // reason the unfloored reinvestment charge survived. Add the case that breaks
+  // differently, not another name that breaks the same way.
+  it.each(['MSFT', 'BHP.AX', 'ARB.AX', 'SGP.AX', 'SHEL.L', 'MSB.AX'])(
     '%s - the sheet formulas reproduce the site valuation',
     async (ticker) => {
       const { v, wacc, pvExplicit, perShare, exitPerShare } = await recomputeFromInputs(ticker);
@@ -277,6 +303,25 @@ describe('workbook reconciles to the site', () => {
       );
     }
   );
+
+  it('reproduces the site valuation when the perpetuity is blocked', async () => {
+    // No fixture has a WACC below its terminal growth, so force it. The whole
+    // perpetuity column collapses to the explicit forecast less net debt, and
+    // the sheet has to land on the same figure the engine does - the site is
+    // not publishing it as a valuation any more, but the workbook still shows
+    // the bridge, and a bridge that disagrees with the engine is worse than one
+    // that refuses.
+    const { v, perShare, exitPerShare } = await recomputeFromInputs('MSFT', 1, {
+      terminalGrowth: 0.5,
+    });
+    expect(v.dcf.gordon.terminal.blocked, 'the case must actually be blocked').toBeTruthy();
+    expect(v.dcf.gordon.terminal.presentValue, 'terminal value must be nil').toBe(0);
+    expect(perShare, 'perpetuity value per share').toBeCloseTo(v.dcf.gordon.valuePerShare, 4);
+    expect(exitPerShare, 'exit multiple value per share').toBeCloseTo(
+      v.dcf.exitMultiple.valuePerShare,
+      4
+    );
+  });
 
   it('converts to quote currency on the sheet for a cross-currency reporter', async () => {
     // BHP reports USD and trades AUD. The sheet must apply the FX itself.
