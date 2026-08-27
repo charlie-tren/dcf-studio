@@ -262,13 +262,32 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   inputCell(a, `B${w.debt}`, v.wacc.totalDebt, MONEY);
   formulaCell(a, `B${w.equityWeight}`, `B${w.mcap}/(B${w.mcap}+B${w.debt})`, RATE, v.wacc.equityWeight);
   formulaCell(a, `B${w.debtWeight}`, `1-B${w.equityWeight}`, RATE, v.wacc.debtWeight);
-  formulaCell(
-    a,
-    `B${w.wacc}`,
-    `B${w.equityWeight}*B${w.coe}+B${w.debtWeight}*B${w.cod}*(1-B${rows.tax})`,
-    RATE,
-    v.wacc.wacc
-  );
+  /**
+   * The WACC slider sets the discount rate directly, and the sheet had nowhere
+   * to put that: B26 was always the formula over the components below, so Excel
+   * recalculated any override straight back out. A 7% override read 10.58% in
+   * the file and valued MSFT at 313.42 against the page's 622.32.
+   *
+   * So when the two disagree the cell becomes an input, marked and noted, and
+   * the components above are left as reported rather than being reverse-fitted
+   * to a number the reader chose.
+   */
+  const waccOverridden = Math.abs(v.assumptions.wacc - v.wacc.wacc) > 1e-9;
+  if (waccOverridden) {
+    inputCell(a, `B${w.wacc}`, v.assumptions.wacc, RATE);
+    note(
+      a.getCell(`C${w.wacc}`),
+      `Set on the page. Built up from the components above it would be ${(v.wacc.wacc * 100).toFixed(2)}%.`
+    );
+  } else {
+    formulaCell(
+      a,
+      `B${w.wacc}`,
+      `B${w.equityWeight}*B${w.coe}+B${w.debtWeight}*B${w.cod}*(1-B${rows.tax})`,
+      RATE,
+      v.wacc.wacc
+    );
+  }
   a.getCell(`B${w.wacc}`).font = { bold: true };
   note(a.getCell(`C${w.rf}`), v.wacc.riskFreeSource);
   note(a.getCell(`C${w.cod}`), v.wacc.costOfDebtSource);
@@ -280,16 +299,22 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   );
 
   sectionHeading(a, 28, 'Base year');
-  const base = { revenue: 29, netDebt: 30, shares: 31, midYear: 32 };
+  const base = { revenue: 29, netDebt: 30, shares: 31, midYear: 32, steadyState: 33 };
   label(a, base.revenue, `Revenue, last reported year (${millions(ccy)})`);
   label(a, base.netDebt, `Net debt (${millions(ccy)})`);
   label(a, base.shares, 'Diluted shares');
   label(a, base.midYear, 'Mid-year discounting (1 = yes, 0 = no)');
+  label(a, base.steadyState, 'Terminal year on a steady-state footing (1 = yes, 0 = no)');
   const latest = v.fundamentals.years[0];
   inputCell(a, `B${base.revenue}`, latest.revenue.value, MONEY);
   inputCell(a, `B${base.netDebt}`, latest.totalDebt.value - latest.cash.value, MONEY);
   inputCell(a, `B${base.shares}`, latest.shares.value, '#,##0');
   inputCell(a, `B${base.midYear}`, v.assumptions.midYearConvention ? 1 : 0, '0');
+  // The terminal chain has three branches in the engine and the sheet used to
+  // hard-code one of them, so turning the steady state off on the page valued
+  // MSFT at 228.49 while the workbook recalculated to 301.81. Put the flag on
+  // the sheet and let the formulas below branch on it, as mid-year already does.
+  inputCell(a, `B${base.steadyState}`, v.assumptions.terminalCapexEqualsDA ? 1 : 0, '0');
   note(a.getCell(`C${base.revenue}`), `Fiscal year ended ${latest.periodEnd}`);
 
   // ------------------------------------------------------------------ Forecast
@@ -482,18 +507,36 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   label(val, t.perShare, 'Value per share');
 
   formulaCell(val, `B${t.finalFcff}`, `Forecast!${lastCol}${r.fcff}`, MONEY, finalYear.fcff);
-  // Maintenance capex: add back the excess of capex over depreciation.
+  /**
+   * The engine's terminal chain has three branches and the sheet used to write
+   * only the middle one, so two states the page exposes came out different in
+   * Excel from what the page showed:
+   *
+   *   steady state off   MSFT 301.81 in the file against 228.49 on the page
+   *   terminal growth <= 0   253.33 against 249.78, off a negative reinvestment
+   *                          rate that credited cash back into the perpetuity
+   *
+   * Both branch on cells now, so the workbook stays live: flip either input in
+   * Excel and it walks the same path the engine would.
+   */
+  const steady = `Assumptions!$B$${base.steadyState}`;
+  const tg = `Assumptions!B${rows.terminalGrowth}`;
+
+  // Maintenance capex: add back the excess of capex over depreciation, unless
+  // the terminal year is being left on the forecast's own capex.
   formulaCell(
     val,
     `B${t.maintenance}`,
-    `B${t.finalFcff}-Forecast!${lastCol}${r.capex}-Forecast!${lastCol}${r.da}`,
+    `IF(${steady}=0,B${t.finalFcff},B${t.finalFcff}-Forecast!${lastCol}${r.capex}-Forecast!${lastCol}${r.da})`,
     MONEY,
     ss?.maintenanceFcff ?? finalYear.fcff
   );
+  // No growth to fund means no reinvestment charge, and a NEGATIVE terminal
+  // growth must not produce a negative charge that pays the perpetuity.
   formulaCell(
     val,
     `B${t.reinvestRate}`,
-    `MIN(Assumptions!B${rows.terminalGrowth}/MAX(Assumptions!B${rows.roic},Assumptions!B${w.wacc}),0.9)`,
+    `IF(OR(${steady}=0,${tg}<=0),0,MIN(${tg}/MAX(Assumptions!B${rows.roic},Assumptions!B${w.wacc}),0.9))`,
     RATE,
     ss?.reinvestmentRate ?? 0
   );
@@ -508,10 +551,13 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     MONEY,
     -(ss?.reinvestment ?? 0)
   );
+  // The floor belongs to the reinvestment branch only. Where there is no charge
+  // the engine capitalises the maintenance figure as it stands, and the sheet
+  // has to make the same choice or the two disagree on a loss-maker.
   formulaCell(
     val,
     `B${t.capitalised}`,
-    `MAX(B${t.maintenance}+B${t.reinvest},0)`,
+    `IF(OR(${steady}=0,${tg}<=0),B${t.maintenance},MAX(B${t.maintenance}+B${t.reinvest},0))`,
     MONEY,
     ss?.capitalisedFcff ?? finalYear.fcff
   );

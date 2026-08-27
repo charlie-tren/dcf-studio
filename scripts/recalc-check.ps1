@@ -24,6 +24,16 @@
 param(
   [int]$Port = 3120,
   [string[]]$Tickers = @('MSFT','SHEL.L','CBA.AX','MSB.AX','SGP.AX','RY.TO','7203.T','ARB.AX','BHP.AX','NPN.JO'),
+  # The engine branches on these and the sheet has to branch with it. Sweeping
+  # tickers alone missed three divergences: the steady-state toggle off, a
+  # negative terminal growth, and a WACC override, which the sheet used to
+  # recalculate straight back out of the file.
+  [string[]]$States = @(
+    'horizon=10', 'scenario=bear', 'scenario=consensus', 'mid=0', 'tcx=0',
+    'wacc=0.07&tg=0.03', 'tg=-0.005', 'wacc=0.14', 'tcx=0&tg=-0.005',
+    'horizon=10&tcx=0&mid=0&scenario=bear'
+  ),
+  [string]$StateTicker = 'MSFT',
   [double]$Tolerance = 1e-6
 )
 
@@ -41,6 +51,12 @@ $Tickers = $Tickers | ForEach-Object { $_ -split ',' } | Where-Object { $_ }
 foreach($t in $Tickers){
   $safe = $t -replace '\.',''
   Invoke-WebRequest -Uri "http://localhost:$Port/api/export?ticker=$t" -OutFile (Join-Path $dir "$safe.xlsx") -UseBasicParsing | Out-Null
+}
+
+$stateIndex = 0
+foreach($q in $States){
+  $stateIndex++
+  Invoke-WebRequest -Uri "http://localhost:$Port/api/export?ticker=$StateTicker&$q" -OutFile (Join-Path $dir "state$stateIndex.xlsx") -UseBasicParsing | Out-Null
 }
 
 # The cached results, read WITHOUT Excel - opening in Excel recalculates them away.
@@ -98,6 +114,6 @@ try {
 
 # Report the denominator, not a bare count: "0 mismatches" and "nothing was
 # examined" produce the same headline otherwise.
-"workbooks $($Tickers.Count), cells compared $compared, mismatches $($mismatches.Count)"
+"workbooks $($Tickers.Count) tickers + $($States.Count) states, cells compared $compared, mismatches $($mismatches.Count)"
 if($compared -lt 100){ throw "Only $compared cells compared - the check found nothing to check." }
 if($mismatches.Count -gt 0){ $mismatches | Format-Table -AutoSize | Out-String | Write-Host; exit 1 }
