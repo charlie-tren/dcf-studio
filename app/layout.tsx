@@ -47,23 +47,36 @@ export default function RootLayout({
             . General information, not advice.
           </div>
         </footer>
-        {/* Cloudflare Web Analytics. Feeds the private stats dashboard, which runs
-            one account-wide query and splits by `requestHost`, so this is
-            deliberately the same token as every other site in the estate.
-            Cookieless. `afterInteractive` keeps it off the hydration path. */}
-        <Script
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          strategy="afterInteractive"
-          data-cf-beacon='{"token": "32b821209b5441a08df42ccf61c9e6c2"}'
-        />
-        {/* Returning people, which Web Analytics cannot answer: it is cookieless
-            and carries no visitor identifier. This reads a date stamp from the
-            visitor's own localStorage and reports two words once per session,
-            new or returning plus an age bucket. See site-stats/beacon. */}
-        <Script
-          src="https://beacon.charlietrenorden.com/b.js"
-          strategy="afterInteractive"
-        />
+        {/* Analytics, gated, one inline script instead of two src ones. Feeds the
+            private stats dashboard, which runs one account-wide query and splits by
+            `requestHost`, so the token is deliberately the same as every other site
+            in the estate. Cookieless, and `afterInteractive` keeps it off the
+            hydration path exactly as the two tags it replaces did.
+
+            The gate: two kinds of visitor are not an audience and never load either
+            beacon. Anyone who has opted out with ?nostats=1, which sets a flag in
+            their own browser that ?nostats=0 undoes. And automation, since
+            `navigator.webdriver` is the one signal true for Playwright, Puppeteer
+            and Selenium alike - this estate drives a headless browser at all twenty
+            sites for thumbnails, head checks and mobile audits, and Cloudflare
+            bot-flags only some of them. This file is a server component so it cannot
+            ask about navigator itself; the gate is a string that runs on the client.
+            See site-stats/beacon and its tests/test_gate.py. */}
+        <Script id="analytics-gate" strategy="afterInteractive">{`
+          (function(){try{var X="ct.nostats",q=location.search;
+          if(q.indexOf("nostats=1")>-1)localStorage.setItem(X,"1");
+          if(q.indexOf("nostats=0")>-1)localStorage.removeItem(X);
+          if(localStorage.getItem(X)||navigator.webdriver)return;
+          var d=document,s;
+          s=d.createElement("script");s.defer=true;
+          s.src="https://static.cloudflareinsights.com/beacon.min.js";
+          s.setAttribute("data-cf-beacon",'{"token": "32b821209b5441a08df42ccf61c9e6c2"}');
+          d.head.appendChild(s);
+          s=d.createElement("script");s.defer=true;
+          s.src="https://beacon.charlietrenorden.com/b.js";
+          d.head.appendChild(s);
+          }catch(e){}})();
+        `}</Script>
       </body>
     </html>
   );
