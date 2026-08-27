@@ -63,10 +63,15 @@ export default function RootLayout({
             ask about navigator itself; the gate is a string that runs on the client.
             See site-stats/beacon and its tests/test_gate.py. */}
         <Script id="analytics-gate" strategy="afterInteractive">{`
-          (function(){try{var X="ct.nostats",q=location.search;
-          if(q.indexOf("nostats=1")>-1)localStorage.setItem(X,"1");
-          if(q.indexOf("nostats=0")>-1)localStorage.removeItem(X);
-          if(localStorage.getItem(X)||navigator.webdriver)return;
+          (function(){try{var X="ct.nostats",C="ct_nostats",
+          D=";path=/;domain=.charlietrenorden.com",q=location.search,out=false;
+          if(q.indexOf("nostats=1")>-1){try{localStorage.setItem(X,"1")}catch(e){}
+          document.cookie=C+"=1"+D+";max-age=63072000;samesite=lax";}
+          if(q.indexOf("nostats=0")>-1){try{localStorage.removeItem(X)}catch(e){}
+          document.cookie=C+"="+D+";max-age=0";}
+          try{out=!!localStorage.getItem(X)}catch(e){}
+          if(!out)out=document.cookie.indexOf(C+"=1")>-1;
+          if(out||navigator.webdriver)return;
           var d=document,s;
           s=d.createElement("script");s.defer=true;
           s.src="https://static.cloudflareinsights.com/beacon.min.js";
