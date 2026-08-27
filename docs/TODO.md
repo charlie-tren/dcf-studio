@@ -82,6 +82,14 @@
   share. The model has no way to tell a real zero from a missing field. Noted 27/08/2026
   while diffing a deployed run against a local one; not investigated further.
 
+- [x] **Reverse DCF verified end to end** - DONE 27/08/2026. Every solved driver was fed
+  back through the engine as an override and the market price checked out: 19 solved drivers
+  across nine tickers, all reproducing the price to 0.000%. The nulls are principled rather
+  than missing - SGP has no revenue growth that reaches its price, CBA no margin, and the
+  loss-maker and the blocked-perpetuity name return nothing at all, which is what the
+  methodology page promises. Proven discriminating: perturbing a solved driver by 10% moves
+  the resulting price about 10% off the market, so the check can fail.
+
 ## Post-v1
 
 - [ ] **Dividend-discount model for financials.** Banks and insurers have no meaningful
