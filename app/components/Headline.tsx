@@ -1,3 +1,4 @@
+import { AlsoOn } from './AlsoOn';
 import { perShare, signedPct } from '@/lib/format';
 import type { Valuation } from '@/lib/valuation';
 
@@ -23,6 +24,7 @@ export function Headline({ v }: { v: Valuation }) {
       <h1 className="mt-2 text-4xl font-semibold tracking-tight text-white">
         {v.fundamentals.name}
       </h1>
+      <AlsoOn ticker={v.fundamentals.ticker} />
 
       <div className="mt-7 flex flex-wrap items-end gap-x-10 gap-y-4">
         <div>

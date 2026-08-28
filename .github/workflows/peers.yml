@@ -1,0 +1,45 @@
+name: Refresh peer coverage
+
+# lib/peers.json says which companies Shortfall and Consensus Drift actually have, and
+# both of those rebuild weekly - Shortfall's universe moves with index membership,
+# Consensus Drift drops around a hundred names a week where estimate history is too
+# sparse to plot. Without this the "Also on" line slowly starts offering links into
+# pages that no longer hold the company.
+#
+# Deliberately cheap: this repo is private, so it draws on the 2,000-minute allowance.
+# The script uses only node builtins and fetch, so there is no npm install - the job
+# is checkout, node, commit, and runs in well under a minute. It also does nothing at
+# all on a week when neither sibling changed, because the commit is conditional.
+#
+# Monday 22:10 UTC, after Consensus Drift's Sunday 21:00 refresh and Shortfall's own,
+# so it reads their new lists rather than last week's.
+on:
+  schedule:
+    - cron: "10 22 * * 1"
+  workflow_dispatch:
+
+jobs:
+  peers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      # tools/peers.mjs refuses a sibling that publishes under half its previous
+      # universe and keeps the committed list instead, so a broken build upstream
+      # cannot silently strip every link from this site.
+      - run: node tools/peers.mjs
+
+      - name: Commit only if coverage actually moved
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/peers.json
+          git diff --staged --quiet && echo "coverage unchanged" && exit 0
+          git commit -m "peers: weekly coverage refresh"
+          git push
