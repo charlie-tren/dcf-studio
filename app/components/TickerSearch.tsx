@@ -54,7 +54,7 @@ export function TickerSearch({ compact = false }: { compact?: boolean } = {}) {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={compact ? 'Another company' : 'Company name or ticker - BHP, Microsoft, Wesfarmers'}
+        placeholder={compact ? 'Search' : 'Company name or ticker - BHP, Microsoft, Wesfarmers'}
         className={
           compact
             ? 'w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--accent)]'
