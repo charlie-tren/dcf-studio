@@ -12,8 +12,19 @@ import type { RawTicker } from '@/lib/yahoo';
 describe('recorded fixtures', () => {
   const files = readdirSync('tests/fixtures').filter((f) => f.endsWith('.json'));
 
-  it('records all eight probe tickers', () => {
-    expect(files).toHaveLength(8);
+  // Reads the recorder's OWN list rather than a hardcoded count. The count broke
+  // the moment a ticker was added (AMD, 09/09/2026) and told you only that a
+  // number had changed - never which fixture was missing. This checks the thing
+  // that actually matters, in both directions: every ticker the recorder claims
+  // to record has a file, and every file on disk is one the recorder maintains.
+  it('has a fixture for every ticker the recorder records, and no orphans', () => {
+    const source = readFileSync('scripts/record-fixtures.ts', 'utf8');
+    const list = source.match(/const TICKERS = \[([^\]]+)\]/);
+    expect(list).not.toBeNull();
+    const expected = [...(list as RegExpMatchArray)[1].matchAll(/'([^']+)'/g)]
+      .map((m) => `${m[1].replace('.', '_')}.json`)
+      .sort();
+    expect([...files].sort()).toEqual(expected);
   });
 
   it.each(files)('%s stores period ends as ISO dates, newest first', (file) => {

@@ -7,6 +7,14 @@ export type HistoricalDrivers = {
   revenueCagr: number;
   ebitMargin: number;
   daPctRevenue: number;
+  /**
+   * The depreciation half of D&A as a share of revenue - what it costs to hold
+   * the productive asset base flat, with acquisition amortisation stripped out.
+   * Equal to daPctRevenue where the accounts give no way to separate them.
+   */
+  depreciationPctRevenue: number;
+  /** True when the split was unavailable and the figure above IS the full D&A. */
+  depreciationIsFullDandA: boolean;
   capexPctRevenue: number;
   nwcPctRevenueChange: number;
   taxRate: number;
@@ -81,6 +89,33 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(Math.max(v, lo), hi);
 }
 
+/**
+ * Depreciation as a share of revenue, averaged over the years that report it.
+ *
+ * Availability is per YEAR, not per company: BHP reports a depreciation line in
+ * three of its four recorded years and CBA in two of four, so this averages over
+ * the years that have one rather than demanding a complete series or none. Where
+ * no year has one - Mesoblast, Seagate - it returns the full D&A ratio and says
+ * so, which is exactly the behaviour that was there before this split existed.
+ */
+function depreciationShare(
+  f: Fundamentals,
+  years: Fundamentals['years'],
+  ratios: (pick: (y: Fundamentals['years'][number]) => number) => number[]
+): { depreciationPctRevenue: number; depreciationIsFullDandA: boolean } {
+  const withLine = years.filter((y) => y.depreciation !== null && y.revenue.value > 0);
+  if (withLine.length === 0) {
+    return {
+      depreciationPctRevenue: mean(ratios((y) => y.dAndA.value)),
+      depreciationIsFullDandA: true,
+    };
+  }
+  const share = mean(
+    withLine.map((y) => (y.depreciation as { value: number }).value / y.revenue.value)
+  );
+  return { depreciationPctRevenue: share, depreciationIsFullDandA: false };
+}
+
 export function historicalDrivers(f: Fundamentals): HistoricalDrivers {
   const years = f.years;
   const latest = years[0];
@@ -124,6 +159,7 @@ export function historicalDrivers(f: Fundamentals): HistoricalDrivers {
     revenueCagr,
     ebitMargin: mean(ratios((y) => y.ebit.value)),
     daPctRevenue: mean(ratios((y) => y.dAndA.value)),
+    ...depreciationShare(f, years, ratios),
     capexPctRevenue: mean(ratios((y) => y.capex.value)),
     // A ratio against a near-zero revenue change explodes; keep it in a sane band.
     nwcPctRevenueChange: nwcRatios.length > 0 ? clamp(median(nwcRatios), -1, 1) : 0,
@@ -204,21 +240,48 @@ export function buildScenario(
   }
 
   let capexPctRevenue = drivers.capexPctRevenue;
+  // DEPRECIATION, not D&A. The rule's own premise - a business cannot depreciate
+  // more than it invests indefinitely - is a statement about assets that wear
+  // out. Amortisation of an acquired intangible is purchase accounting unwinding
+  // a cheque already written, and nothing has to be re-spent to replace it.
+  //
+  // Read against the combined figure, this fired on any acquisitive company.
+  // AMD spends 2.40% of revenue on capex against 2.17% depreciation - it is not
+  // underinvesting in anything - but its D&A runs at 13.46% because three
+  // quarters of it is Xilinx intangible amortisation. The floor duly replaced
+  // AMD's capex with 13.46% of revenue, 5,298m a year against the 974m it
+  // actually spends, in every forecast year. That is most of why this model
+  // valued AMD at $8 against a $506 share price.
+  //
+  // The terminal still forces capex up to full D&A (see terminalFcff in
+  // lib/dcf.ts), which is right and is what stops the amortisation add-back
+  // running as free cashflow in perpetuity. The two treatments are consistent:
+  // real capex while the intangible is running off, maintenance capex forever
+  // after.
+  const depreciation = drivers.depreciationPctRevenue;
   const belowDepreciation =
-    drivers.daPctRevenue > 0 && capexPctRevenue < drivers.daPctRevenue * CAPEX_TO_DA_FLOOR;
+    depreciation > 0 && capexPctRevenue < depreciation * CAPEX_TO_DA_FLOOR;
   const negligible = capexPctRevenue < CAPEX_TO_REVENUE_FLOOR;
 
   if (belowDepreciation || negligible) {
     // Substitute depreciation, or a floor where depreciation is itself negligible
-    // (a REIT reports both against PPE it barely holds).
-    const substitute = Math.max(drivers.daPctRevenue, CAPEX_TO_REVENUE_FLOOR);
+    // (a REIT reports both against PPE it barely holds). Substituting the figure
+    // the test was made against - anything else reintroduces the bug on the
+    // write side.
+    const substitute = Math.max(depreciation, CAPEX_TO_REVENUE_FLOOR);
+    const measure = drivers.depreciationIsFullDandA
+      ? 'depreciation and amortisation'
+      : 'depreciation';
+    const caveat = drivers.depreciationIsFullDandA
+      ? ' The accounts do not separate depreciation from amortisation, so the combined charge is used - if a large part of it is amortisation of an acquisition, the reported capex is probably right and this substitution is not.'
+      : '';
     const reason = negligible
       ? `Reported capital expenditure averages just ${(drivers.capexPctRevenue * 100).toFixed(2)}% of revenue, which is too low to be the company's real investment - property trusts and similar structures invest through lines that are not reported as capex.`
-      : `Reported capital expenditure averages ${(drivers.capexPctRevenue * 100).toFixed(2)}% of revenue against depreciation of ${(drivers.daPctRevenue * 100).toFixed(2)}%. A business cannot depreciate more than it invests indefinitely.`;
+      : `Reported capital expenditure averages ${(drivers.capexPctRevenue * 100).toFixed(2)}% of revenue against ${measure} of ${(depreciation * 100).toFixed(2)}%. A business cannot depreciate more than it invests indefinitely.`;
     flags.push({
       code: 'CAPEX_BELOW_DA',
       severity: 'warn',
-      message: `${reason} Capex has been set to ${(substitute * 100).toFixed(2)}% of revenue so the forecast is not handed free growth. Override it if the reported figure is right.`,
+      message: `${reason} Capex has been set to ${(substitute * 100).toFixed(2)}% of revenue so the forecast is not handed free growth.${caveat} Override it if the reported figure is right.`,
     });
     capexPctRevenue = substitute;
   }

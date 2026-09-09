@@ -54,6 +54,12 @@ export type FiscalYear = {
   taxProvision: Sourced<number>;
   pretaxIncome: Sourced<number>;
   dAndA: Sourced<number>;
+  /**
+   * The depreciation half of D&A - the charge against productive assets that
+   * genuinely has to be re-spent to stand still. Null where the accounts give no
+   * way to separate it from amortisation of acquired intangibles.
+   */
+  depreciation: Sourced<number> | null;
   /** Positive = cash outflow. */
   capex: Sourced<number>;
   /** Positive = increase in net working capital = cash outflow. */

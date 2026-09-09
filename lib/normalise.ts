@@ -30,6 +30,10 @@ const DA_CHAIN = [
   'reconciledDepreciation',
   'depreciationAndAmortizationInIncomeStatement',
 ];
+/** The depreciation half on its own, where the accounts report it directly. */
+const DEPRECIATION_CHAIN = ['depreciation'];
+/** The amortisation half, so the depreciation half can be derived by difference. */
+const INTANGIBLE_AMORTISATION_CHAIN = ['amortizationOfIntangibles', 'amortizationCashFlow'];
 /**
  * Broadest measure FIRST. Net debt should net off everything the company could
  * realistically use to repay debt, which includes marketable securities.
@@ -127,6 +131,50 @@ function investedCapital(row: RawStatementRow): Sourced<number> | null {
     : null;
 }
 
+/**
+ * The depreciation half of D&A, separated from amortisation of acquired
+ * intangibles.
+ *
+ * These two are added together on the cashflow statement and behave nothing
+ * alike. Depreciation is a charge against assets that wear out and have to be
+ * replaced, so it is a fair first proxy for maintenance capital. Amortisation of
+ * an acquired intangible is purchase accounting unwinding a cheque already
+ * written; the company does not have to buy the customer list again.
+ *
+ * Conflating them is what put AMD at $8 a share. Three quarters of its D&A is
+ * Xilinx intangible amortisation, and the capex floor in lib/scenarios.ts read
+ * the combined figure, decided AMD was underinvesting, and substituted 5,298m of
+ * capex a year against the 974m it actually spends.
+ *
+ * Two sources, in order of how much they are trusted, and NEITHER is a guess:
+ *   1. A reported `depreciation` line. Present for most large issuers, and for a
+ *      company with no acquired intangibles it simply equals D&A - so the split
+ *      is a no-op exactly where it should be (Microsoft, Shell, Tesla).
+ *   2. D&A less a reported intangible-amortisation line, where only that half is
+ *      given.
+ * Where neither exists this returns null rather than inventing a number, and the
+ * caller falls back to the old behaviour and says that it did. Mesoblast and
+ * Seagate report the combined figure and nothing else.
+ */
+function depreciationOnly(
+  row: RawStatementRow,
+  dAndA: Sourced<number>
+): Sourced<number> | null {
+  const reported = firstOf(row, DEPRECIATION_CHAIN);
+  if (reported) return reported;
+  const amortisation = firstOf(row, INTANGIBLE_AMORTISATION_CHAIN);
+  if (!amortisation) return null;
+  const difference = dAndA.value - amortisation.value;
+  // A negative difference means the two lines are not the pair they look like -
+  // different scopes, or one is a duplicate of the other. Better no figure than
+  // a negative depreciation charge feeding a capex floor.
+  if (difference < 0) return null;
+  return derivedValue(
+    difference,
+    `${dAndA.provenance.sourceField} less ${amortisation.provenance.sourceField}`
+  );
+}
+
 function buildYear(
   row: RawStatementRow,
   previous: RawStatementRow | undefined,
@@ -164,6 +212,7 @@ function buildYear(
   }
 
   const dAndA = firstOf(row, DA_CHAIN) ?? derivedValue(0, 'No depreciation or amortisation reported');
+  const depreciation = depreciationOnly(row, dAndA);
   const rawCapex = firstOf(row, ['capitalExpenditure']);
   const capex = rawCapex
     ? { value: -rawCapex.value, provenance: rawCapex.provenance }
@@ -180,6 +229,7 @@ function buildYear(
     taxProvision: firstOf(row, ['taxProvision']) ?? sourced(0, 'taxProvision'),
     pretaxIncome,
     dAndA,
+    depreciation,
     capex,
     changeInNwc: nwc,
     totalDebt: firstOf(row, ['totalDebt']) ?? derivedValue(0, 'No total debt reported'),

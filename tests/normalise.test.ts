@@ -217,3 +217,57 @@ describe('normalise - non-ordinary lines', () => {
     }
   });
 });
+
+describe('normalise - depreciation of productive assets, split out from D&A', () => {
+  // The capex floor exists to catch a business that depreciates more than it
+  // invests. That premise holds for PP&E and fails for amortisation of acquired
+  // intangibles, which is purchase accounting running off an asset already
+  // bought - nothing has to be spent to replace it. So the floor needs the
+  // depreciation half on its own, and this is where it comes from.
+  it('reads the reported depreciation line where there is one', () => {
+    const f = normalise('AMD', fixture('AMD'));
+    const y = f.years[0];
+    expect(y.dAndA.value).toBeGreaterThan(2.5e9);
+    expect(y.depreciation?.value).toBeGreaterThan(0);
+    // AMD's D&A is roughly four times its depreciation. That gap is Xilinx.
+    expect(y.depreciation!.value).toBeLessThan(y.dAndA.value / 3);
+    expect(y.depreciation!.provenance.sourceField).toBe('depreciation');
+  });
+
+  it('leaves depreciation equal to D&A for a company with no acquired intangibles', () => {
+    // Microsoft reports the same number in both fields. The split must be a
+    // no-op here, or this change would move a valuation it has no business
+    // moving.
+    const f = normalise('MSFT', fixture('MSFT'));
+    const y = f.years[0];
+    expect(y.depreciation?.value).toBeCloseTo(y.dAndA.value, 0);
+  });
+
+  it('derives depreciation as D&A less intangible amortisation where the line is missing', () => {
+    // BHP's oldest recorded year reports depreciationAndAmortization but no
+    // depreciation line, and the years around it do report one - so the derived
+    // branch has to produce something consistent with its neighbours rather
+    // than a hole.
+    const f = normalise('BHP.AX', fixture('BHP.AX'));
+    const withValue = f.years.filter((y) => y.depreciation !== null);
+    expect(withValue.length).toBeGreaterThan(0);
+    for (const y of withValue) expect(y.depreciation!.value).toBeLessThanOrEqual(y.dAndA.value);
+  });
+
+  it('reports null rather than guessing when neither the line nor the split exists', () => {
+    // Mesoblast reports depreciationAndAmortization and nothing else. Inventing
+    // a depreciation figure here would put a number the accounts do not contain
+    // underneath a capex decision.
+    const f = normalise('MSB.AX', fixture('MSB.AX'));
+    expect(f.years[0].depreciation).toBeNull();
+  });
+
+  it('never returns a negative depreciation from the derived branch', () => {
+    for (const t of ['MSFT', 'BHP.AX', 'ARB.AX', 'CBA.AX', 'SGP.AX', 'MSB.AX', 'SHEL.L', 'RY.TO', 'AMD']) {
+      const f = normalise(t, fixture(t));
+      for (const y of f.years) {
+        if (y.depreciation) expect(y.depreciation.value).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});

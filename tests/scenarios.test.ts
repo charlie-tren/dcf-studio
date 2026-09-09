@@ -198,3 +198,65 @@ describe('buildScenario - exit multiple disclosure', () => {
     }
   });
 });
+
+describe('the capex floor tests against depreciation, not against D&A', () => {
+  // The floor's own stated premise is that a business cannot depreciate more
+  // than it invests indefinitely. True of PP&E; false of amortisation of an
+  // acquired intangible, which is a cheque already written. Reading the combined
+  // figure made the floor fire on any acquisitive company and replace its real
+  // capex with a number several times larger.
+  it('derives depreciation separately from D&A where the accounts allow it', () => {
+    const d = historicalDrivers(fundamentals('AMD'));
+    expect(d.depreciationPctRevenue).toBeGreaterThan(0);
+    expect(d.depreciationPctRevenue).toBeLessThan(d.daPctRevenue / 3);
+    expect(d.depreciationIsFullDandA).toBe(false);
+  });
+
+  it('does not fire the floor on AMD, whose capex exceeds its depreciation', () => {
+    // 974m of capex against 750m of depreciation. AMD is not underinvesting in
+    // its productive assets; it bought Xilinx. Before 09/09/2026 this flag fired
+    // and set capex to 13.46% of revenue against the 2.4% actually spent, which
+    // is most of why the model valued AMD at 2% of its market price.
+    const s = buildScenario(fundamentals('AMD'), 'base', 5, 0.10);
+    expect(s.flags.some((f) => f.code === 'CAPEX_BELOW_DA')).toBe(false);
+    expect(s.assumptions.capexPctRevenue).toBeLessThan(0.05);
+    expect(s.assumptions.capexPctRevenue).not.toBeCloseTo(s.assumptions.daPctRevenue, 4);
+  });
+
+  it('still fires the floor on a company that genuinely underinvests', () => {
+    // Mesoblast: capex 1m against 6m of D&A, and no split available, so the
+    // fallback keeps the old behaviour. Narrowing the test must not disarm it.
+    const s = buildScenario(fundamentals('MSB.AX'), 'base', 5, 0.10);
+    expect(s.flags.some((f) => f.code === 'CAPEX_BELOW_DA')).toBe(true);
+  });
+
+  it('falls back to D&A and says so where no depreciation line exists', () => {
+    const d = historicalDrivers(fundamentals('MSB.AX'));
+    expect(d.depreciationIsFullDandA).toBe(true);
+    expect(d.depreciationPctRevenue).toBeCloseTo(d.daPctRevenue, 10);
+  });
+
+  it('changes nothing for a company whose D&A is all depreciation', () => {
+    // Microsoft reports one number in both fields, so this whole change must be
+    // invisible to it. A fix that quietly moves every valuation is not a fix.
+    const d = historicalDrivers(fundamentals('MSFT'));
+    expect(d.depreciationPctRevenue).toBeCloseTo(d.daPctRevenue, 6);
+    const s = buildScenario(fundamentals('MSFT'), 'base', 5, 0.10);
+    expect(s.flags.some((f) => f.code === 'CAPEX_BELOW_DA')).toBe(false);
+  });
+
+  it('substitutes depreciation rather than D&A when the floor does bind', () => {
+    // The substitute is "what it costs to hold the asset base flat", so it has
+    // to be the same quantity the test was made against. Substituting the
+    // combined figure after testing the depreciation half would reintroduce the
+    // bug on the write side.
+    const f = fundamentals('SGP.AX');
+    const d = historicalDrivers(f);
+    const s = buildScenario(f, 'base', 5, 0.10);
+    if (s.flags.some((x) => x.code === 'CAPEX_BELOW_DA')) {
+      expect(s.assumptions.capexPctRevenue).toBeLessThanOrEqual(
+        Math.max(d.depreciationPctRevenue, 0.01) + 1e-9
+      );
+    }
+  });
+});
