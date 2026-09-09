@@ -10,17 +10,26 @@ name: Publish valuations
 # 6.8 minutes at four concurrent, 506 published, 103 dropped as implausible, none
 # failed to model.
 #
-# 22:40 UTC, after the Crosscheck build it takes its universe from and before Crosscheck
-# reads this file back the next day. The order only matters on a day when the universe
-# changes; a stale ticker list costs a few rows, not a broken page.
+# 15:30 UTC, aiming to land before Crosscheck's 18:40 relay slot even after GitHub's
+# habitual lateness - measured 3-7 hours behind schedule on this account, so this is a
+# hope rather than a guarantee and the consumer is built not to need it. Crosscheck
+# reads whatever valuations.json is currently published and does not wait.
+#
+# NO HEARTBEAT TRIGGER, and that is not an oversight. The Worker that fires the rest of
+# the estate from outside GitHub holds a classic PAT scoped `public_repo`, and this
+# repository is private, so a dispatch here would 404 on every attempt with the only
+# symptom being a job that never runs. Adding the trigger would look like a safety net
+# and be nothing of the kind. If this job ever needs to be punctual, the fix is a token
+# with `repo` scope, which is a real decision about blast radius rather than a config
+# line - the same token reaches eight repositories across three accounts.
+#
+# What that costs today: nothing that shows. The universe moves by a handful of names a
+# week and the column is an ordering, so a late run means the same ranking arrives a few
+# hours later, not a wrong one.
 on:
   schedule:
-    - cron: "40 22 * * *"
+    - cron: "30 15 * * *"
   workflow_dispatch:
-  # Fired by the heartbeat Worker from OUTSIDE GitHub Actions. On 26/08/2026 GitHub's
-  # scheduler went down and took every cron on the estate with it, catch-ups included.
-  repository_dispatch:
-    types: [heartbeat-valuations]
 
 jobs:
   publish:
