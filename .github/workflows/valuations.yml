@@ -1,0 +1,72 @@
+name: Publish valuations
+
+# public/valuations.json is this model's output as data, for Crosscheck to join
+# against. Before it existed the three-way join was recorded as blocked, with the only
+# route being to request all 609 pages over HTTP - about fifty minutes of Vercel
+# function time on an app that caches nothing, with 609 Yahoo pulls behind it anyway.
+#
+# buildValuation is a plain function, so the model runs here directly and the answer is
+# committed. Vercel is not in the path at all. Measured 09/09/2026: 609 companies in
+# 6.8 minutes at four concurrent, 506 published, 103 dropped as implausible, none
+# failed to model.
+#
+# 22:40 UTC, after the Crosscheck build it takes its universe from and before Crosscheck
+# reads this file back the next day. The order only matters on a day when the universe
+# changes; a stale ticker list costs a few rows, not a broken page.
+on:
+  schedule:
+    - cron: "40 22 * * *"
+  workflow_dispatch:
+  # Fired by the heartbeat Worker from OUTSIDE GitHub Actions. On 26/08/2026 GitHub's
+  # scheduler went down and took every cron on the estate with it, catch-ups included.
+  repository_dispatch:
+    types: [heartbeat-valuations]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # The run itself is ~7 minutes; the ceiling is for a day when Yahoo is slow rather
+    # than a target. A job that hangs past this is a failed run and should say so.
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # Refuses to write if it publishes under half the previous run's companies. A
+      # batch of network calls fails in the one way that looks like success - most
+      # throw, the survivors get written, and the file is valid JSON with too few rows.
+      - run: npx tsx scripts/publish-valuations.ts
+
+      - name: Commit only if the numbers actually moved
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Explicit pathspec. This repo takes pushes from several sessions and a bare
+          # `git add -A` in a bot job is how an unrelated change ends up inside a commit
+          # titled "valuations".
+          git add public/valuations.json
+          git diff --staged --quiet && echo "valuations unchanged" && exit 0
+          git commit -m "valuations: $(date -u +%Y-%m-%d)"
+          for attempt in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "push attempt $attempt lost a race - replaying onto master"
+            git fetch origin master
+            # --mixed, NOT --soft. `reset --soft` leaves the INDEX holding this run's
+            # entire checked-out tree, so the replay commit rewrites every tracked file
+            # back to how it stood when the job started, silently reverting anything
+            # pushed in between. That is not hypothetical: the hub's thumbnail workflow
+            # did exactly this on 26/08/2026 and undid an estate-wide analytics change.
+            git reset --mixed origin/master
+            git add public/valuations.json
+            git diff --staged --quiet && exit 0
+            git commit -m "valuations: $(date -u +%Y-%m-%d)"
+            sleep 3
+          done
+          echo "::error::could not push after 3 attempts"
+          exit 1
