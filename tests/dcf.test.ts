@@ -163,8 +163,10 @@ describe('runDcf - terminal capex normalisation', () => {
   it('capitalises a steady-state cashflow net of the reinvestment growth requires', () => {
     const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.20 });
     const final = r.forecast[4];
-    // Maintenance capex only, then subtract g/ROIC of NOPAT for growth.
-    const maintenance = final.fcff + final.capex - final.dAndA;
+    // Maintenance capex only and the working-capital build added back, so this
+    // is NOPAT, then subtract g/ROIC of it for growth. Working capital is part
+    // of reinvestment, so charging it here as well was charging it twice.
+    const maintenance = final.fcff + final.capex - final.dAndA + final.changeInNwc;
     const reinvestment = final.nopat * (0.025 / 0.20);
     const expected = ((maintenance - reinvestment) * 1.025) / (0.10 - 0.025);
     expect(r.gordon.terminal.undiscounted).toBeCloseTo(expected, 2);
@@ -195,7 +197,7 @@ describe('runDcf - terminal capex normalisation', () => {
   it('applies no reinvestment charge at zero terminal growth', () => {
     const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalGrowth: 0, terminalRoic: 0.2 });
     const final = r.forecast[4];
-    const maintenance = final.fcff + final.capex - final.dAndA;
+    const maintenance = final.fcff + final.capex - final.dAndA + final.changeInNwc;
     expect(r.gordon.terminal.undiscounted).toBeCloseTo(maintenance / 0.10, 2);
   });
 
@@ -230,7 +232,12 @@ describe('runDcf - terminal capex normalisation', () => {
     const final = r.forecast[4];
 
     expect(ss.forecastFcff).toBeCloseTo(final.fcff, 8);
-    expect(ss.maintenanceFcff).toBeCloseTo(final.fcff + final.capex - final.dAndA, 8);
+    expect(ss.maintenanceFcff).toBeCloseTo(
+      final.fcff + final.capex - final.dAndA + final.changeInNwc,
+      8
+    );
+    // Which is NOPAT, stated the other way round so the bridge is legible.
+    expect(ss.maintenanceFcff).toBeCloseTo(final.nopat, 8);
     expect(ss.reinvestmentRate).toBeCloseTo(0.025 / 0.20, 8);
     expect(ss.reinvestment).toBeCloseTo(final.nopat * ss.reinvestmentRate, 8);
     // The bridge must add up.
@@ -329,5 +336,68 @@ describe('runDcf - full reconciliation against an independent recompute', () => 
     expect(lossMaker.forecast[4].nopat, 'the fixture must actually lose money').toBeLessThan(0);
     expect(ss.reinvestment).toBe(0);
     expect(ss.capitalisedFcff).toBe(Math.max(ss.maintenanceFcff, 0));
+  });
+});
+
+describe('runDcf - the terminal charges working capital once, not twice', () => {
+  // terminalFcff's own docstring states the intended formula:
+  //     FCFF_terminal = NOPAT x (1 - g / ROIC)
+  // and says "the reinvestment rate funds growth on top". The code computed
+  //     fcff + capex - D&A            which reduces to NOPAT - changeInNwc
+  // and THEN subtracted the reinvestment charge, so working capital was
+  // deducted twice - and the first deduction was sized to the final EXPLICIT
+  // year's growth rate, which is the wrong growth entirely. Microsoft's terminal
+  // carried a working-capital build struck at 16% growth inside a 2.5% growth
+  // perpetuity.
+  const A: Assumptions = {
+    ...REF_ASSUMPTIONS,
+    terminalCapexEqualsDA: true,
+    terminalRoic: 0.20,
+  };
+
+  it('capitalises NOPAT less the reinvestment charge, and nothing else', () => {
+    const r = runDcf(REF_INPUTS, A);
+    const y5 = r.forecast[4];
+    const s = r.gordon.terminal.steadyState!;
+    expect(s.maintenanceFcff).toBeCloseTo(y5.nopat, 6);
+    expect(s.capitalisedFcff).toBeCloseTo(y5.nopat * (1 - A.terminalGrowth / 0.20), 6);
+  });
+
+  it('does not let the final year working-capital build into the perpetuity', () => {
+    const s = runDcf(REF_INPUTS, A).gordon.terminal.steadyState!;
+    const y5 = runDcf(REF_INPUTS, A).forecast[4];
+    expect(y5.changeInNwc).toBeGreaterThan(0);
+    expect(s.maintenanceFcff).not.toBeCloseTo(y5.fcff + y5.capex - y5.dAndA, 6);
+  });
+
+  it('is unaffected by the working-capital assumption at all', () => {
+    // The strongest form of the claim: nwcPctRevenueChange must not touch the
+    // terminal. It still moves the explicit years, so the total does move - only
+    // the capitalised figure is invariant.
+    const lo = runDcf(REF_INPUTS, { ...A, nwcPctRevenueChange: 0 });
+    const hi = runDcf(REF_INPUTS, { ...A, nwcPctRevenueChange: 0.9 });
+    expect(hi.gordon.terminal.steadyState!.capitalisedFcff).toBeCloseTo(
+      lo.gordon.terminal.steadyState!.capitalisedFcff,
+      6
+    );
+    expect(hi.forecast[4].fcff).toBeLessThan(lo.forecast[4].fcff);
+  });
+
+  it('still removes the growth-phase capex overspend from the perpetuity', () => {
+    // The other half of terminalCapexEqualsDA must survive. A company spending
+    // 7% of revenue on capex against 5% depreciation should not be assumed to
+    // outspend its own depreciation forever.
+    const s = runDcf(REF_INPUTS, A).gordon.terminal.steadyState!;
+    expect(s.maintenanceFcff).toBeGreaterThan(runDcf(REF_INPUTS, A).forecast[4].fcff);
+  });
+
+  it('leaves the terminal alone when the normalisation is switched off', () => {
+    const s = runDcf(REF_INPUTS, { ...A, terminalCapexEqualsDA: false }).gordon.terminal.steadyState!;
+    expect(s.maintenanceFcff).toBeCloseTo(runDcf(REF_INPUTS, A).forecast[4].fcff, 6);
+  });
+
+  it('still floors a loss-maker at zero rather than crediting it cash', () => {
+    const loss = runDcf(REF_INPUTS, { ...A, ebitMargin: [-0.2, -0.2, -0.2, -0.2, -0.2] });
+    expect(loss.gordon.terminal.steadyState!.capitalisedFcff).toBe(0);
   });
 });

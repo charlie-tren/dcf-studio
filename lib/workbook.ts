@@ -495,7 +495,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     perShare: 14,
   };
   label(val, t.finalFcff, 'Final year free cashflow');
-  label(val, t.maintenance, 'Free cashflow with capex at depreciation');
+  label(val, t.maintenance, 'Net operating profit after tax (capex at depreciation)');
   label(val, t.reinvestRate, 'Reinvestment rate (g / ROIC)');
   label(val, t.reinvest, 'Less reinvestment to fund terminal growth');
   label(val, t.capitalised, 'Cashflow capitalised');
@@ -522,12 +522,19 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   const steady = `Assumptions!$B$${base.steadyState}`;
   const tg = `Assumptions!B${rows.terminalGrowth}`;
 
-  // Maintenance capex: add back the excess of capex over depreciation, unless
-  // the terminal year is being left on the forecast's own capex.
+  // Maintenance capex, and the working-capital movement added back, so this row
+  // is NOPAT - the reinvestment charge below funds ALL of the growth investment,
+  // working capital included. The capex and working-capital rows are stored
+  // negative on the Forecast sheet, so subtracting them adds them back.
+  //
+  // This sheet is the second copy of terminalFcff in lib/dcf.ts and has to move
+  // with it. It did not, on 09/09/2026, and five workbook reconciliation tests
+  // caught it within seconds - which is the whole reason they compare formulas
+  // against the engine rather than against recorded numbers.
   formulaCell(
     val,
     `B${t.maintenance}`,
-    `IF(${steady}=0,B${t.finalFcff},B${t.finalFcff}-Forecast!${lastCol}${r.capex}-Forecast!${lastCol}${r.da})`,
+    `IF(${steady}=0,B${t.finalFcff},B${t.finalFcff}-Forecast!${lastCol}${r.capex}-Forecast!${lastCol}${r.da}-Forecast!${lastCol}${r.nwc})`,
     MONEY,
     ss?.maintenanceFcff ?? finalYear.fcff
   );

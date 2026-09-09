@@ -64,7 +64,14 @@ Perpetuity growth is intrinsic. The exit multiple defaults to the company&apos;s
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt className="text-[var(--text-faint)]">Capex reset to depreciation</dt>
+                      {/* This row is NOPAT: capex reset to depreciation AND the
+                          working-capital movement added back, because the
+                          reinvestment charge on the next row funds both. The
+                          label said only the first half and the number stopped
+                          matching it on 09/09/2026. */}
+                      <dt className="text-[var(--text-faint)]">
+                        Capex at depreciation, working capital in reinvestment
+                      </dt>
                       <dd className="text-[var(--text-dim)]">
                         {money(m.terminal.steadyState.maintenanceFcff, currency)}
                       </dd>

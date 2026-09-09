@@ -148,7 +148,7 @@ function AssumptionPanelInner({
         </button>
         <button
           onClick={() => push({ tcx: assumptions.terminalCapexEqualsDA ? '0' : '1' })}
-          title="On: maintenance capex at depreciation, plus g/ROIC of NOPAT reinvested to fund terminal growth. Off: capitalises the final year's FCFF as forecast."
+          title="On: maintenance capex at depreciation and the working-capital movement released, then g/ROIC of NOPAT reinvested to fund terminal growth - one reinvestment charge covering both. Off: capitalises the final year's FCFF as forecast."
           className={`rounded-md border px-3 py-1.5 text-sm transition-colors duration-100 ${
             assumptions.terminalCapexEqualsDA
               ? 'border-[var(--border-strong)] text-[var(--text-dim)] hover:border-[var(--accent)] hover:text-[var(--text)]'

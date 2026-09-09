@@ -228,6 +228,7 @@ describe('workbook reconciles to the site', () => {
     let prevRevenue = baseRevenue;
     let pvExplicit = 0;
     let finalFcff = 0;
+    let finalNwc = 0;
     let finalNopat = 0;
     let finalCapex = 0;
     let finalDa = 0;
@@ -255,6 +256,7 @@ describe('workbook reconciles to the site', () => {
       prevRevenue = revenue;
       finalFcff = fcff;
       finalNopat = nopat;
+      finalNwc = nwc;
       finalCapex = capex;
       finalDa = da;
       finalEbit = ebit;
@@ -264,7 +266,9 @@ describe('workbook reconciles to the site', () => {
     // mirrored deliberately: this harness omitted them, which is precisely why
     // a loss-maker's reinvestment credit and a blocked perpetuity both got past
     // a suite that claimed to reconcile the sheet to the engine.
-    const maintenance = finalFcff + finalCapex - finalDa;
+    // + finalNwc, so this is NOPAT: the reinvestment charge below funds the
+    // working capital too. See terminalFcff in lib/dcf.ts.
+    const maintenance = finalFcff + finalCapex - finalDa + finalNwc;
     const reinvestRate = Math.min(terminalGrowth / Math.max(roic, wacc), 0.9);
     const capitalised = Math.max(maintenance - Math.max(finalNopat, 0) * reinvestRate, 0);
     const tv =
