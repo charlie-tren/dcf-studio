@@ -12,7 +12,13 @@ export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string 
     {
       label: 'Beta',
       value: w.beta.toFixed(3),
-      note: w.betaClamped ? `Clamped from a reported ${w.rawBeta?.toFixed(3)}` : 'As reported',
+      // Three distinct states, and the reader deserves to know which one this is:
+      // untouched, Blume-adjusted, or adjusted AND still clamped.
+      note: w.betaClamped
+        ? `Clamped from a reported ${w.rawBeta?.toFixed(3)}`
+        : w.betaAdjusted
+          ? `Reported ${w.rawBeta?.toFixed(3)}, pulled toward 1.0 (Blume)`
+          : 'As reported',
     },
     {
       label: 'Cost of equity',

@@ -65,6 +65,47 @@ export type Valuation = {
   notes: string[];
 };
 
+/** Order of magnitude between the model and the market, or null if the gap is
+ *  merely a disagreement.
+ *
+ *  scripts/inspect-valuations.ts has carried the rule for months: a result more
+ *  than ~10x off the price is a units or currency bug, not a valuation opinion.
+ *  It only ever said so to me, in a terminal. This puts it on the page.
+ *
+ *  It changes NO number. A flagged valuation still renders in full - the point is
+ *  that the page stops presenting "98% overvalued" with the same face it uses for
+ *  "15% overvalued", when only one of those is a view the model can support.
+ *
+ *  Deliberately symmetric and deliberately wide. 10x either way is far outside
+ *  any defensible discount-rate or growth disagreement, so anything it catches is
+ *  a modelling failure by construction.
+ */
+export function implausibleResult(
+  valuePerShare: number,
+  price: number
+): DataQualityFlag | null {
+  // A missing or non-positive price is already its own flag; dividing by it would
+  // manufacture a second, louder one out of a gap already reported.
+  if (!Number.isFinite(price) || price <= 0) return null;
+  // Negative equity value has its own causes and its own flags. A ratio test would
+  // report it as a units bug, which it is not.
+  if (!Number.isFinite(valuePerShare) || valuePerShare < 0) return null;
+  const ratio = valuePerShare / price;
+  if (ratio < 10 && ratio > 0.1) return null;
+  const how = ratio >= 10
+    ? `${ratio.toFixed(1)}x the market price`
+    : `${(ratio * 100).toFixed(1)}% of the market price`;
+  return {
+    code: 'IMPLAUSIBLE_RESULT',
+    severity: 'error',
+    message:
+      `This model values the shares at ${how}. A gap that size is a modelling `
+      + `failure rather than a view - most often an unusable beta, a currency or `
+      + `units mismatch, or a cashflow base that does not represent the business. `
+      + `Read the figures below as diagnostics, not as a call.`,
+  };
+}
+
 export async function buildValuation(
   ticker: string,
   request: ValuationRequest,
@@ -171,6 +212,11 @@ export async function buildValuation(
       flags.push({ code: 'CAPEX_BELOW_DA', severity: 'warn', message: warning });
     }
   }
+  const implausible = implausibleResult(
+    valuePerShareQuoted,
+    fundamentals.price
+  );
+  if (implausible) flags.push(implausible);
   if (dcf.gordon.terminal.blocked) {
     flags.push({
       code: 'TERMINAL_GROWTH_BLOCKED',

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildWacc, BETA_FLOOR, BETA_CEILING } from '@/lib/wacc';
+import { implausibleResult } from '@/lib/valuation';
 
 const BASE = {
   riskFree: { rate: 0.042, source: 'US 10-year Treasury (^TNX)', assumed: false },
@@ -13,9 +14,15 @@ const BASE = {
 };
 
 describe('buildWacc', () => {
-  it('computes cost of equity as rf + beta x ERP', () => {
+  // The beta in the CAPM line is the BLUMED beta, not the reported one. These two
+  // tests asserted rf + 1.2 x ERP directly until 09/09/2026 and so encoded the
+  // absence of the adjustment as if it were the requirement.
+  const BLUMED = 0.67 * 1.2 + 0.33 * 1.0;   // 1.134
+
+  it('computes cost of equity as rf + beta x ERP, on the adjusted beta', () => {
     const w = buildWacc(BASE);
-    expect(w.costOfEquity).toBeCloseTo(0.042 + 1.2 * 0.055, 10);
+    expect(w.beta).toBeCloseTo(BLUMED, 10);
+    expect(w.costOfEquity).toBeCloseTo(0.042 + BLUMED * 0.055, 10);
   });
 
   it('weights equity and debt by market cap and total debt', () => {
@@ -26,7 +33,7 @@ describe('buildWacc', () => {
 
   it('applies the tax shield to the debt leg only', () => {
     const w = buildWacc(BASE);
-    const expected = 0.8 * (0.042 + 1.2 * 0.055) + 0.2 * 0.05 * (1 - 0.30);
+    const expected = 0.8 * (0.042 + BLUMED * 0.055) + 0.2 * 0.05 * (1 - 0.30);
     expect(w.costOfDebt).toBeCloseTo(0.05, 10);
     expect(w.wacc).toBeCloseTo(expected, 10);
   });
@@ -109,5 +116,105 @@ describe('buildWacc', () => {
     const w = buildWacc(BASE);
     expect(w.wacc).toBeGreaterThan(0.05);
     expect(w.wacc).toBeLessThan(0.15);
+  });
+});
+
+describe('Blume adjustment', () => {
+  // Added 09/09/2026. Yahoo's raw beta went straight into the cost of equity with
+  // nothing but a clamp at 2.5, so AMD's 2.476 passed through untouched and gave an
+  // 18.4% WACC. Probed across 25 names: median implied value / market price was 0.63
+  // for beta under 1.2 and 0.06 for beta at or above it - a tenfold split, with
+  // TSLA at 0.06, Seagate 0.05, Western Digital 0.07 and AMD 0.02. A raw beta is a
+  // noisy point estimate of a quantity that mean-reverts, which is the whole reason
+  // Blume's adjustment exists and why Bloomberg has shipped it by default for decades.
+  const BLUME_W = 0.67;
+  const blume = (raw: number) => BLUME_W * raw + (1 - BLUME_W) * 1.0;
+
+  it('pulls a high beta toward the market', () => {
+    const w = buildWacc({ ...BASE, rawBeta: 2.476 });     // AMD, as reported
+    expect(w.beta).toBeCloseTo(blume(2.476), 6);          // 1.989
+    expect(w.beta).toBeLessThan(2.476);
+    expect(w.rawBeta).toBeCloseTo(2.476, 6);              // the raw value is kept
+  });
+
+  it('pulls a low beta UP toward the market, not down', () => {
+    // The adjustment is symmetric. A 0.30 beta is as much a noisy estimate as a 2.5.
+    const w = buildWacc({ ...BASE, rawBeta: 0.35 });
+    expect(w.beta).toBeCloseTo(blume(0.35), 6);           // 0.565
+    expect(w.beta).toBeGreaterThan(0.35);
+  });
+
+  it('leaves a market beta alone', () => {
+    const w = buildWacc({ ...BASE, rawBeta: 1.0 });
+    expect(w.beta).toBeCloseTo(1.0, 10);
+  });
+
+  it('takes AMD from an 18.4% cost of equity to something defensible', () => {
+    const amd = buildWacc({ ...BASE, riskFree: { rate: 0.0462, source: 't', assumed: false },
+                            rawBeta: 2.476 });
+    expect(amd.costOfEquity).toBeLessThan(0.16);
+    expect(amd.costOfEquity).toBeGreaterThan(0.13);
+  });
+
+  it('still clamps a beta that is absurd AFTER adjusting', () => {
+    // Blume alone would leave 5.0 at 3.68, which is still not a discount rate.
+    const w = buildWacc({ ...BASE, rawBeta: 5.0 });
+    expect(w.beta).toBeCloseTo(BETA_CEILING, 10);
+    expect(w.betaClamped).toBe(true);
+  });
+
+  it('does not adjust a MISSING beta - the default already IS the market', () => {
+    const w = buildWacc({ ...BASE, rawBeta: null });
+    expect(w.beta).toBeCloseTo(1.0, 10);
+    expect(w.betaAdjusted).toBe(false);
+  });
+
+  it('records that it adjusted, so the page can say so', () => {
+    expect(buildWacc({ ...BASE, rawBeta: 1.8 }).betaAdjusted).toBe(true);
+    expect(buildWacc({ ...BASE, rawBeta: null }).betaAdjusted).toBe(false);
+  });
+});
+
+describe('implausibleResult', () => {
+  // The threshold is not a taste call. inspect-valuations.ts has said for months
+  // that "a result more than ~10x off the price is a units or currency bug, not a
+  // valuation opinion", and this puts that sentence on the page instead of leaving
+  // it in a script only I run.
+  it('says nothing about an ordinary disagreement', () => {
+    expect(implausibleResult(50, 100)).toBeNull();   // half price
+    expect(implausibleResult(300, 100)).toBeNull();  // 3x
+    expect(implausibleResult(900, 100)).toBeNull();  // 9x, still an opinion
+  });
+
+  it('flags a value 10x or more above the price', () => {
+    const flag = implausibleResult(1200, 100);
+    expect(flag?.code).toBe('IMPLAUSIBLE_RESULT');
+    expect(flag?.severity).toBe('error');
+    expect(flag?.message).toMatch(/12/);
+  });
+
+  it('flags a value 10x or more BELOW the price, which is the AMD case', () => {
+    // AMD came out at 0.02x the market price. A 98% overvaluation call is not a
+    // view anyone would defend; it is the model saying it could not model this.
+    expect(implausibleResult(3.4, 170)?.code).toBe('IMPLAUSIBLE_RESULT');
+  });
+
+  it('is symmetric at the boundary', () => {
+    expect(implausibleResult(1000, 100)).not.toBeNull();
+    expect(implausibleResult(10, 100)).not.toBeNull();
+    expect(implausibleResult(999, 100)).toBeNull();
+  });
+
+  it('says nothing when there is no price to compare against', () => {
+    // A missing price is already its own flag. Dividing by it would turn one
+    // known gap into a second, more alarming, invented one.
+    expect(implausibleResult(50, 0)).toBeNull();
+    expect(implausibleResult(50, NaN)).toBeNull();
+  });
+
+  it('says nothing about a negative value per share', () => {
+    // Negative equity value has its own causes and its own flags; running it
+    // through a ratio test would report it as a units bug.
+    expect(implausibleResult(-20, 100)).toBeNull();
   });
 });

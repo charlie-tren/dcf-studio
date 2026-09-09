@@ -20,6 +20,7 @@ export type DataQualityCode =
   | 'NO_ANALYST_COVERAGE'
   | 'CAPEX_BELOW_DA'
   | 'NEGATIVE_FCFF'
+  | 'IMPLAUSIBLE_RESULT'
   | 'SHORT_HISTORY'
   | 'TERMINAL_GROWTH_BLOCKED'
   | 'STALE_DATA'
@@ -183,6 +184,8 @@ export type WaccBreakdown = {
   rawBeta: number | null;
   beta: number;
   betaClamped: boolean;
+  /** True when the Blume adjustment moved the reported beta toward the market. */
+  betaAdjusted: boolean;
   costOfEquity: number;
   costOfDebt: number;
   costOfDebtSource: string;
