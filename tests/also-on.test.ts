@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import peers from '../lib/peers.json';
 
 /**
@@ -16,8 +17,34 @@ type Peer = { label: string; asOf: string | null; tickers: string[] };
 const sites = peers as Record<string, Peer>;
 
 describe('peer manifest', () => {
-  it('carries both sibling sites', () => {
-    expect(Object.keys(sites).sort()).toEqual(['consensus-drift', 'shortfall']);
+  it('carries every sibling site the component can render, and no others', () => {
+    // Checked against the component's OWN map rather than a hardcoded list. Two files
+    // have to agree - tools/peers.mjs fetches the manifests and AlsoOn.tsx decides
+    // which ones become links - and a name present in one and missing from the other
+    // fails silently: a site with no entry in SITES is fetched every build and never
+    // shown. This is the same drift that killed the heartbeat Worker for three days
+    // in September, so it is asserted in both directions rather than counted.
+    const source = readFileSync(
+      new URL('../app/components/AlsoOn.tsx', import.meta.url),
+      'utf8'
+    );
+    const block = source.slice(source.indexOf('const SITES'), source.indexOf('};'));
+    const rendered = [...block.matchAll(/^\s*'?([a-z-]+)'?:\s*\(t\)/gm)].map((m) => m[1]);
+    expect(rendered.sort()).toEqual(Object.keys(sites).sort());
+  });
+
+  it('holds Crosscheck to the companies BOTH of the other two carry', () => {
+    // Crosscheck is Shortfall crossed against Consensus Drift, so by construction it
+    // cannot contain a company either of them lacks. If it ever does, the join key has
+    // drifted on one side and the links from here would land on a page that cannot
+    // show the company - the exact failure the manifest check exists to prevent.
+    const sf = new Set(sites.shortfall.tickers);
+    const cd = new Set(sites['consensus-drift'].tickers);
+    const stray = sites.crosscheck.tickers.filter((t) => !sf.has(t) || !cd.has(t));
+    expect(stray, 'in Crosscheck but not in both parents').toEqual([]);
+    // And it must be a real subset rather than a copy of one of them.
+    expect(sites.crosscheck.tickers.length).toBeLessThan(sf.size);
+    expect(sites.crosscheck.tickers.length).toBeGreaterThan(300);
   });
 
   it('is not empty for either site', () => {

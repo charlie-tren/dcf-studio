@@ -18,6 +18,7 @@ const SITES: Record<string, (t: string) => string> = {
   shortfall: (t) => `https://charlietrenorden.com/shortfall/?q=${encodeURIComponent(t)}`,
   'consensus-drift': (t) =>
     `https://charlietrenorden.com/consensus-drift/?q=${encodeURIComponent(t)}`,
+  crosscheck: (t) => `https://charlietrenorden.com/crosscheck/?q=${encodeURIComponent(t)}`,
 };
 
 type Peer = { label: string; asOf: string | null; tickers: string[] };

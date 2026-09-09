@@ -32,6 +32,14 @@ const SITES = {
     href: (t) => `https://charlietrenorden.com/consensus-drift/?q=${encodeURIComponent(t)}`,
     manifest: 'https://charlietrenorden.com/consensus-drift/tickers.json',
   },
+  // Crosscheck is the two sites above crossed against each other, so it only covers a
+  // company both of them carry - 609 of Shortfall's 640. It publishes the same manifest
+  // as the others precisely so this link can be checked rather than assumed.
+  crosscheck: {
+    label: 'Crosscheck',
+    href: (t) => `https://charlietrenorden.com/crosscheck/?q=${encodeURIComponent(t)}`,
+    manifest: 'https://charlietrenorden.com/crosscheck/tickers.json',
+  },
 };
 
 const MIN_KEEP = 0.5;
