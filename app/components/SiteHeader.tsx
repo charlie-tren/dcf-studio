@@ -38,6 +38,14 @@ export function SiteHeader() {
           >
             Methodology
           </Link>
+          {/* A sibling site, so it sits beside Other projects and reads as navigation.
+              No arrow: the arrow there means up a level, and this one goes sideways. */}
+          <a
+            href="https://charlietrenorden.com/crosscheck/"
+            className="text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
+          >
+            Crosscheck
+          </a>
           <a
             href="https://charlietrenorden.com/"
             target="_blank"
