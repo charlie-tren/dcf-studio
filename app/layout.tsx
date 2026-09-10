@@ -14,10 +14,38 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/* The custom domain, not the Vercel origin. Both serve this app, so without a
+   canonical they are two indexable copies of every page - and the one people
+   are given is dcf.charlietrenorden.com. metadataBase also resolves the
+   relative og:image and canonical below, which Next otherwise emits as paths
+   that no scraper can fetch. */
+const SITE = new URL("https://dcf.charlietrenorden.com");
+
+const DESCRIPTION =
+  "Type a company. Get a discounted cashflow valuation built from its reported financials, with every assumption shown.";
+
 export const metadata: Metadata = {
+  metadataBase: SITE,
   title: "DCF Studio",
-  description:
-    "Type a company. Get a discounted cashflow valuation built from its reported financials, with every assumption shown.",
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  /* og-card.png is built by tools/make_card.py out of globals.css, and the
+     width/height are declared because X and Slack reserve the slot before the
+     image arrives; without them a slow fetch collapses the card. */
+  openGraph: {
+    type: "website",
+    siteName: "DCF Studio",
+    title: "DCF Studio",
+    description: DESCRIPTION,
+    url: "/",
+    images: [{ url: "/og-card.png", width: 1200, height: 630, alt: "DCF Studio" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DCF Studio",
+    description: DESCRIPTION,
+    images: ["/og-card.png"],
+  },
 };
 
 export default function RootLayout({

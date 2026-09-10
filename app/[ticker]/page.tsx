@@ -21,9 +21,31 @@ type Props = {
 export async function generateMetadata({ params }: Props) {
   const { ticker } = await params;
   const symbol = decodeURIComponent(ticker).toUpperCase();
+  const description = `Discounted cashflow valuation of ${symbol}, with every assumption and intermediate line visible.`;
   return {
     title: `${symbol} - DCF Studio`,
-    description: `Discounted cashflow valuation of ${symbol}, with every assumption and intermediate line visible.`,
+    description,
+    /* Every assumption this page takes lives in the query string, so one company
+       has an unbounded number of URLs and each shared permutation would index as
+       its own page. They all canonicalise to the bare ticker. */
+    alternates: { canonical: `/${symbol}` },
+    /* Stated in full rather than inherited: Next replaces the parent openGraph
+       object wholesale, so naming title and description without the image would
+       drop the card and leave twitter:card reserving an empty slot. */
+    openGraph: {
+      type: "website",
+      siteName: "DCF Studio",
+      title: `${symbol} - DCF Studio`,
+      description,
+      url: `/${symbol}`,
+      images: [{ url: "/og-card.png", width: 1200, height: 630, alt: "DCF Studio" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${symbol} - DCF Studio`,
+      description,
+      images: ["/og-card.png"],
+    },
   };
 }
 
