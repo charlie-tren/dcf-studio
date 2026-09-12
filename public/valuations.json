@@ -5,9 +5,9 @@
  "measure": "implied value per share divided by market price, base case, 5-year forecast",
  "note": "An ORDERING, not a fair value. This model on defaults runs systematically below market prices, so rank these rather than printing them.",
  "attempted": 609,
- "published": 508,
- "dropped_implausible": 101,
- "could_not_model": 0,
+ "published": 489,
+ "dropped_implausible": 97,
+ "could_not_model": 23,
  "ratios": {
   "A": 0.2894,
   "A2M.AX": 0.6209,
@@ -268,7 +268,7 @@
   "KMB": 0.634,
   "KMI": 0.1196,
   "KO": 0.4723,
-  "KR": 0.7715,
+  "KR": 0.4767,
   "KVUE": 0.7622,
   "LDOS": 1.4289,
   "LEN": 1.9441,
@@ -497,26 +497,7 @@
   "WDS.AX": 0.9753,
   "WELL": 0.1051,
   "WES.AX": 0.3574,
-  "WFC": 0.9292,
-  "WHC.AX": 3.1662,
-  "WM": 0.5896,
-  "WMB": 0.1633,
-  "WMT": 0.3412,
-  "WOR.AX": 0.7235,
-  "WRB": 2.6739,
-  "WSM": 0.3278,
-  "WST": 0.2498,
-  "WTC.AX": 0.4377,
-  "WTW": 0.8441,
-  "WYNN": 2.8609,
-  "XRO.AX": 0.1396,
-  "XYL": 0.7302,
-  "XYZ": 0.2595,
-  "YUM": 0.8941,
-  "ZBH": 0.8217,
-  "ZBRA": 0.1852,
-  "ZIP.AX": 0.5554,
-  "ZTS": 1.3479
+  "WFC": 1.02
  },
  "prices": {
   "A": [
@@ -2473,82 +2454,6 @@
   ],
   "WFC": [
    90.29,
-   "USD"
-  ],
-  "WHC.AX": [
-   8.6,
-   "AUD"
-  ],
-  "WM": [
-   213.46,
-   "USD"
-  ],
-  "WMB": [
-   72.85,
-   "USD"
-  ],
-  "WMT": [
-   107.15,
-   "USD"
-  ],
-  "WOR.AX": [
-   9.76,
-   "AUD"
-  ],
-  "WRB": [
-   69.9,
-   "USD"
-  ],
-  "WSM": [
-   226.23,
-   "USD"
-  ],
-  "WST": [
-   346.23,
-   "USD"
-  ],
-  "WTC.AX": [
-   32.69,
-   "AUD"
-  ],
-  "WTW": [
-   315.61,
-   "USD"
-  ],
-  "WYNN": [
-   87.7,
-   "USD"
-  ],
-  "XRO.AX": [
-   67.05,
-   "AUD"
-  ],
-  "XYL": [
-   106.96,
-   "USD"
-  ],
-  "XYZ": [
-   79.21,
-   "USD"
-  ],
-  "YUM": [
-   140.87,
-   "USD"
-  ],
-  "ZBH": [
-   93.49,
-   "USD"
-  ],
-  "ZBRA": [
-   350.37,
-   "USD"
-  ],
-  "ZIP.AX": [
-   2.13,
-   "AUD"
-  ],
-  "ZTS": [
-   72.97,
    "USD"
   ]
  }
