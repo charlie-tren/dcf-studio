@@ -48,7 +48,7 @@ const UNIVERSE = 'https://charlietrenorden.com/crosscheck/tickers.json';
  */
 const CONCURRENCY = 4;
 
-type Row = { ticker: string; ratio: number };
+type Row = { ticker: string; ratio: number; price: number; currency: string };
 
 async function pool<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
@@ -94,7 +94,16 @@ async function main() {
         dropped++;
         return null;
       }
-      return { ticker, ratio: Number(ratio.toFixed(4)) };
+      return {
+        ticker,
+        ratio: Number(ratio.toFixed(4)),
+        // The price the ratio was struck against, in the quote currency. Published so a
+        // consumer can record it daily and, later, plot what the score DID against what
+        // it said - the one graph that can validate a composite like Crosscheck's, and
+        // one that needs a history nobody had started keeping.
+        price: Number(v.fundamentals.price.toFixed(4)),
+        currency: v.fundamentals.quoteCurrency,
+      };
     } catch {
       // A company the model cannot value is an ordinary outcome here, not an error:
       // no statements, a currency with no rate, a blocked perpetuity. It is COUNTED,
@@ -138,6 +147,7 @@ async function main() {
         dropped_implausible: dropped,
         could_not_model: failed,
         ratios: Object.fromEntries(rows.map((r) => [r.ticker, r.ratio])),
+        prices: Object.fromEntries(rows.map((r) => [r.ticker, [r.price, r.currency]])),
       },
       null,
       1
