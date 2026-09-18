@@ -253,11 +253,18 @@ export function buildScenario(
   // actually spends, in every forecast year. That is most of why this model
   // valued AMD at $8 against a $506 share price.
   //
-  // The terminal still forces capex up to full D&A (see terminalFcff in
-  // lib/dcf.ts), which is right and is what stops the amortisation add-back
-  // running as free cashflow in perpetuity. The two treatments are consistent:
-  // real capex while the intangible is running off, maintenance capex forever
-  // after.
+  // The terminal treats the intangible as GONE, which is the other half of this and
+  // was got wrong here first. This comment used to say the terminal "forces capex up
+  // to full D&A, which is right and is what stops the amortisation add-back running
+  // as free cashflow in perpetuity". The first clause was true and the second was the
+  // wrong cure: forcing capex to full D&A does stop the add-back, but it also keeps
+  // DEDUCTING the amortisation inside EBIT forever, so the charge outlived the asset.
+  //
+  // A perpetuity starts after the intangible has amortised away. At that point the
+  // P&L carries no charge and there is no add-back either, so the terminal holds
+  // neither: EBITA, taxed, against maintenance capex at depreciation. See
+  // terminalFcff in lib/dcf.ts. The two treatments are still consistent - real capex
+  // and the real charge while the intangible runs off, neither of them afterwards.
   const depreciation = drivers.depreciationPctRevenue;
   const belowDepreciation =
     depreciation > 0 && capexPctRevenue < depreciation * CAPEX_TO_DA_FLOOR;
@@ -310,6 +317,7 @@ export function buildScenario(
       ebitMargin: Array(horizonYears).fill(drivers.ebitMargin + marginTilt),
       taxRate: drivers.taxRate,
       daPctRevenue: drivers.daPctRevenue,
+      depreciationPctRevenue: drivers.depreciationPctRevenue,
       capexPctRevenue,
       nwcPctRevenueChange: drivers.nwcPctRevenueChange,
       terminalGrowth: DEFAULT_TERMINAL_GROWTH + terminalTilt,

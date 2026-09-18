@@ -135,7 +135,28 @@ function terminalFcff(finalYear: ForecastYear, a: Assumptions): SteadyState {
   // 13 fell. The 13 are companies whose history RELEASED working capital (IBM,
   // Johnson & Johnson, Apple) and were being credited that release in
   // perpetuity, which is no more real than the charge.
-  const maintenanceFcff = finalYear.fcff + finalYear.capex - finalYear.dAndA + finalYear.changeInNwc;
+  //
+  // THE ACQUIRED INTANGIBLE HAS RUN OFF BY HERE, so it leaves both sides of the
+  // terminal. The line below used to be `fcff + capex - dAndA + changeInNwc`, which
+  // by the identity at the top of this file reduces exactly to NOPAT - the add-back
+  // cancelling in full. Right for depreciation, because worn-out plant has to be
+  // replaced. Wrong for the amortisation of an acquisition: you do not re-buy Xilinx
+  // every year, so the charge was being deducted inside EBIT in perpetuity against a
+  // capital commitment that does not exist. For AMD that is ~2.25bn a year of
+  // phantom cost capitalised forever.
+  //
+  // The opposite error is just as easy and is what the note in scenarios.ts was
+  // guarding against: adding the amortisation back as free cash forever claims cash
+  // from an intangible that has gone. Neither belongs in a steady state, so both come
+  // out - EBITA, taxed, against maintenance capex at depreciation.
+  //
+  // depreciation equals D&A where the accounts do not separate them, making this a
+  // no-op for those tickers, and it is floored at D&A so a reported depreciation line
+  // larger than D&A cannot turn the correction into a penalty.
+  const depreciation = Math.min(finalYear.revenue * a.depreciationPctRevenue, finalYear.dAndA);
+  const amortisation = Math.max(finalYear.dAndA - depreciation, 0);
+  const terminalNopat = (finalYear.ebit + amortisation) * (1 - a.taxRate);
+  const maintenanceFcff = terminalNopat;
   if (a.terminalGrowth <= 0) {
     return { ...base, maintenanceFcff, capitalisedFcff: maintenanceFcff };
   }
@@ -155,7 +176,7 @@ function terminalFcff(finalYear: ForecastYear, a: Assumptions): SteadyState {
   // zero too and Mesoblast's maintenance line was negative anyway - but it moves
   // the number wherever maintenance cashflow is positive on negative NOPAT,
   // which large depreciation can produce, and it moves it the conservative way.
-  const reinvestment = Math.max(finalYear.nopat, 0) * reinvestmentRate;
+  const reinvestment = Math.max(terminalNopat, 0) * reinvestmentRate;
   return {
     forecastFcff: finalYear.fcff,
     maintenanceFcff,

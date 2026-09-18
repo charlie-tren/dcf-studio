@@ -9,6 +9,7 @@ export const REF_ASSUMPTIONS: Assumptions = {
   ebitMargin: [0.20, 0.20, 0.20, 0.20, 0.20],
   taxRate: 0.30,
   daPctRevenue: 0.05,
+  depreciationPctRevenue: 0.05,   // no amortisation in this fixture
   capexPctRevenue: 0.07,
   nwcPctRevenueChange: 0.10,
   terminalGrowth: 0.025,
@@ -157,6 +158,7 @@ describe('runDcf - terminal capex normalisation', () => {
     ...REF_ASSUMPTIONS,
     capexPctRevenue: 0.2270,
     daPctRevenue: 0.0525,
+    depreciationPctRevenue: 0.0525,   // no amortisation in this fixture
     terminalCapexEqualsDA: true,
   };
 
@@ -279,6 +281,7 @@ describe('runDcf - terminal capex normalisation', () => {
       ...REF_ASSUMPTIONS,
       capexPctRevenue: 0.02,
       daPctRevenue: 0.08,
+      depreciationPctRevenue: 0.08,   // no amortisation in this fixture
       terminalCapexEqualsDA: true,
     };
     const naive = runDcf(REF_INPUTS, { ...underInvestor, terminalCapexEqualsDA: false });
@@ -399,5 +402,83 @@ describe('runDcf - the terminal charges working capital once, not twice', () => 
   it('still floors a loss-maker at zero rather than crediting it cash', () => {
     const loss = runDcf(REF_INPUTS, { ...A, ebitMargin: [-0.2, -0.2, -0.2, -0.2, -0.2] });
     expect(loss.gordon.terminal.steadyState!.capitalisedFcff).toBe(0);
+  });
+});
+
+describe('the acquired intangible leaves both sides of the terminal', () => {
+  // AMD's shape, which is what found this: D&A runs at 13.5% of revenue while
+  // depreciation is a quarter of that, because three quarters of the charge is
+  // Xilinx intangible amortisation. Every fixture above has depreciation equal to
+  // D&A, so none of them could see the fault - the amortisation term was zero in
+  // all of them and the terminal read correctly by accident.
+  const ACQUISITIVE: Assumptions = {
+    ...REF_ASSUMPTIONS,
+    daPctRevenue: 0.1346,
+    depreciationPctRevenue: 0.0337,
+    capexPctRevenue: 0.0337,
+    terminalCapexEqualsDA: true,
+    terminalRoic: 0.20,
+  };
+
+  it('strikes terminal earnings on EBITA, not on GAAP EBIT', () => {
+    const r = runDcf(REF_INPUTS, ACQUISITIVE);
+    const ss = r.gordon.terminal.steadyState;
+    expect(ss).toBeDefined();
+    if (!ss) return;
+    const final = r.forecast[4];
+
+    const depreciation = final.revenue * ACQUISITIVE.depreciationPctRevenue;
+    const amortisation = final.dAndA - depreciation;
+    expect(amortisation).toBeGreaterThan(0);          // the fixture is doing its job
+
+    const ebita = (final.ebit + amortisation) * (1 - ACQUISITIVE.taxRate);
+    expect(ss.maintenanceFcff).toBeCloseTo(ebita, 8);
+
+    // And it is strictly MORE than the old treatment, by the after-tax amortisation.
+    // Stated as a difference rather than a level, because that difference is the
+    // whole defect: it was being deducted in perpetuity against a capital
+    // commitment that does not exist.
+    expect(ss.maintenanceFcff - final.nopat).toBeCloseTo(
+      amortisation * (1 - ACQUISITIVE.taxRate),
+      8
+    );
+  });
+
+  it('charges reinvestment on the same earnings it capitalises', () => {
+    // Leaving the reinvestment charge on the old, smaller NOPAT would undersize it
+    // against a larger cashflow - a second, quieter flattering of the valuation on
+    // top of the fix.
+    const r = runDcf(REF_INPUTS, ACQUISITIVE);
+    const ss = r.gordon.terminal.steadyState!;
+    expect(ss.reinvestment).toBeCloseTo(ss.maintenanceFcff * ss.reinvestmentRate, 8);
+    expect(ss.capitalisedFcff).toBeCloseTo(ss.maintenanceFcff - ss.reinvestment, 8);
+  });
+
+  it('is a no-op where the accounts do not separate depreciation from amortisation', () => {
+    // depreciationIsFullDandA sets the two equal. The terminal must then read exactly
+    // as it did before this change, or every ticker without a reported depreciation
+    // line silently revalues on a distinction its accounts never made.
+    const unsplit: Assumptions = {
+      ...ACQUISITIVE,
+      depreciationPctRevenue: ACQUISITIVE.daPctRevenue,
+    };
+    const r = runDcf(REF_INPUTS, unsplit);
+    const ss = r.gordon.terminal.steadyState!;
+    const final = r.forecast[4];
+    expect(ss.maintenanceFcff).toBeCloseTo(final.nopat, 8);
+  });
+
+  it('cannot be turned into a penalty by a depreciation line above D&A', () => {
+    // A reported depreciation larger than D&A is a data artefact, not a fact about
+    // the business. Unfloored it makes `amortisation` negative and DEDUCTS it, which
+    // would be the original bug with the sign flipped.
+    const odd: Assumptions = {
+      ...ACQUISITIVE,
+      depreciationPctRevenue: ACQUISITIVE.daPctRevenue * 2,
+    };
+    const r = runDcf(REF_INPUTS, odd);
+    const ss = r.gordon.terminal.steadyState!;
+    const final = r.forecast[4];
+    expect(ss.maintenanceFcff).toBeCloseTo(final.nopat, 8);
   });
 });

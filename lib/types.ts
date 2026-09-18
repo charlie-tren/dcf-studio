@@ -99,6 +99,14 @@ export type Assumptions = {
   ebitMargin: number[];
   taxRate: number;
   daPctRevenue: number;
+  /**
+   * The depreciation half of D&A as a share of revenue. The terminal needs the two
+   * halves apart: depreciation is a recurring capital commitment, amortisation of an
+   * acquired intangible is not and has run off by the time a perpetuity starts.
+   * Equal to daPctRevenue where the accounts do not separate them, which makes the
+   * terminal treatment a no-op rather than a guess.
+   */
+  depreciationPctRevenue: number;
   capexPctRevenue: number;
   nwcPctRevenueChange: number;
   terminalGrowth: number;

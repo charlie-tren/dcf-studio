@@ -8,6 +8,7 @@ const A: Assumptions = {
   ebitMargin: Array(5).fill(0.20),
   taxRate: 0.30,
   daPctRevenue: 0.05,
+  depreciationPctRevenue: 0.05,   // no amortisation in this fixture
   capexPctRevenue: 0.07,
   nwcPctRevenueChange: 0.10,
   terminalGrowth: 0.025,
