@@ -1,13 +1,13 @@
 {
  "site": "DCF Studio",
  "url": "https://dcf.charlietrenorden.com/",
- "as_of": "2026-10-03",
+ "as_of": "2026-10-04",
  "measure": "implied value per share divided by market price, base case, 5-year forecast",
  "note": "An ORDERING, not a fair value. This model on defaults runs systematically below market prices, so rank these rather than printing them.",
  "attempted": 608,
- "published": 478,
- "dropped_implausible": 98,
- "could_not_model": 32,
+ "published": 504,
+ "dropped_implausible": 104,
+ "could_not_model": 0,
  "ratios": {
   "A": 0.2426,
   "A2M.AX": 0.6062,
@@ -69,7 +69,7 @@
   "BEN": 0.5288,
   "BF-B": 0.8187,
   "BG": 0.7482,
-  "BHP.AX": 0.8971,
+  "BHP.AX": 0.897,
   "BIIB": 0.9625,
   "BKNG": 1.205,
   "BKR": 0.7232,
@@ -103,7 +103,7 @@
   "CHD": 0.672,
   "CHRW": 0.1535,
   "CI": 3.9412,
-  "CIA.AX": 2.6594,
+  "CIA.AX": 2.6584,
   "CINF": 3.5874,
   "CL": 0.931,
   "CLX": 0.5852,
@@ -191,7 +191,7 @@
   "FIX": 0.3596,
   "FLEX": 0.144,
   "FLT.AX": 0.7336,
-  "FMG.AX": 1.5186,
+  "FMG.AX": 1.5185,
   "FOXA": 1.6337,
   "FRT": 0.2418,
   "FSLR": 0.5412,
@@ -213,7 +213,7 @@
   "GPC": 0.7988,
   "GPN": 0.6539,
   "GPT.AX": 0.5908,
-  "GQG.AX": 6.2777,
+  "GQG.AX": 6.2773,
   "GRMN": 0.5395,
   "GWW": 0.4082,
   "HAL": 1.3637,
@@ -278,7 +278,7 @@
   "LLY": 0.732,
   "LMT": 1.3872,
   "LNT": 0.2403,
-  "LNW.AX": 1.4472,
+  "LNW.AX": 1.4471,
   "LOV.AX": 0.9206,
   "LOW": 0.6337,
   "LRCX": 0.1794,
@@ -323,7 +323,7 @@
   "NDSN": 0.3141,
   "NEE": 0.1141,
   "NEM": 1.0436,
-  "NEM.AX": 0.8752,
+  "NEM.AX": 0.8751,
   "NFLX": 1.3266,
   "NHC.AX": 0.7526,
   "NHF.AX": 1.4711,
@@ -376,14 +376,14 @@
   "PPT.AX": 1.1111,
   "PRN.AX": 1.2751,
   "PRU": 1.8657,
-  "PRU.AX": 1.691,
+  "PRU.AX": 1.6908,
   "PSA": 0.4926,
   "PSX": 0.106,
   "PTC": 0.5172,
   "PWR": 0.2467,
   "PYPL": 1.2104,
   "QAN.AX": 2.3624,
-  "QBE.AX": 1.6973,
+  "QBE.AX": 1.6972,
   "QCOM": 0.5036,
   "RCL": 0.5052,
   "RDX.AX": 1.0249,
@@ -396,7 +396,7 @@
   "RJF": 1.2834,
   "RL": 0.5713,
   "RMD": 0.9196,
-  "RMD.AX": 0.8427,
+  "RMD.AX": 0.8426,
   "RMS.AX": 0.5833,
   "ROK": 0.2017,
   "ROL": 0.7486,
@@ -404,7 +404,7 @@
   "ROST": 0.4308,
   "RRL.AX": 1.2075,
   "RSG": 0.5532,
-  "RSG.AX": 1.1102,
+  "RSG.AX": 1.1101,
   "RTX": 0.3812,
   "RVTY": 0.2285,
   "RWC.AX": 0.3669,
@@ -486,7 +486,33 @@
   "VST": 0.1901,
   "VZ": 1.729,
   "WAB": 0.3134,
-  "WAF.AX": 3.6324
+  "WAF.AX": 3.6324,
+  "WAT": 0.3078,
+  "WDAY": 0.1278,
+  "WDC": 0.1702,
+  "WDS.AX": 1.0249,
+  "WELL": 0.1092,
+  "WES.AX": 0.331,
+  "WFC": 1.0223,
+  "WHC.AX": 2.775,
+  "WM": 0.6064,
+  "WMB": 0.1534,
+  "WMT": 0.331,
+  "WOR.AX": 0.8322,
+  "WRB": 2.6219,
+  "WSM": 0.3096,
+  "WST": 0.2298,
+  "WTC.AX": 0.4343,
+  "WTW": 0.9754,
+  "WYNN": 3.3174,
+  "XRO.AX": 0.16,
+  "XYL": 0.8804,
+  "XYZ": 0.2732,
+  "YUM": 0.8656,
+  "ZBH": 0.827,
+  "ZBRA": 0.188,
+  "ZIP.AX": 0.5755,
+  "ZTS": 1.4121
  },
  "prices": {
   "A": [
@@ -2400,6 +2426,110 @@
   "WAF.AX": [
    3.51,
    "AUD"
+  ],
+  "WAT": [
+   425.21,
+   "USD"
+  ],
+  "WDAY": [
+   186.14,
+   "USD"
+  ],
+  "WDC": [
+   415.29,
+   "USD"
+  ],
+  "WDS.AX": [
+   31.24,
+   "AUD"
+  ],
+  "WELL": [
+   227.71,
+   "USD"
+  ],
+  "WES.AX": [
+   76.22,
+   "AUD"
+  ],
+  "WFC": [
+   80.45,
+   "USD"
+  ],
+  "WHC.AX": [
+   7.59,
+   "AUD"
+  ],
+  "WM": [
+   204.45,
+   "USD"
+  ],
+  "WMB": [
+   70.54,
+   "USD"
+  ],
+  "WMT": [
+   104.26,
+   "USD"
+  ],
+  "WOR.AX": [
+   9.51,
+   "AUD"
+  ],
+  "WRB": [
+   68.98,
+   "USD"
+  ],
+  "WSM": [
+   232.3,
+   "USD"
+  ],
+  "WST": [
+   364.98,
+   "USD"
+  ],
+  "WTC.AX": [
+   33.43,
+   "AUD"
+  ],
+  "WTW": [
+   288.61,
+   "USD"
+  ],
+  "WYNN": [
+   75.88,
+   "USD"
+  ],
+  "XRO.AX": [
+   57.85,
+   "AUD"
+  ],
+  "XYL": [
+   101.79,
+   "USD"
+  ],
+  "XYZ": [
+   74.33,
+   "USD"
+  ],
+  "YUM": [
+   136.12,
+   "USD"
+  ],
+  "ZBH": [
+   88.29,
+   "USD"
+  ],
+  "ZBRA": [
+   375.86,
+   "USD"
+  ],
+  "ZIP.AX": [
+   2.07,
+   "AUD"
+  ],
+  "ZTS": [
+   69.69,
+   "USD"
   ]
  }
 }
