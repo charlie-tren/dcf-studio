@@ -90,6 +90,28 @@
   methodology page promises. Proven discriminating: perturbing a solved driver by 10% moves
   the resulting price about 10% off the market, so the check can fail.
 
+- [ ] **The three P2 items left from the 03/10 external review.** Logged rather than
+  built, because none is a defect and each changes a documented default:
+  - **Cost of debt from a synthetic rating** (interest coverage to a spread, as in
+    Damodaran's table) instead of flooring at the risk-free rate. The best of the three:
+    the floor is right for a bank whose interest expense includes deposits, and wrong for
+    a leveraged industrial whose real borrowing cost sits well above it.
+  - **Sector-aware exit-multiple band.** The 3-20x clamp applies to the DEFAULT only; the
+    slider already goes to 25x, so this is about the starting point, not a cap a reader is
+    stuck with.
+  - **Country equity risk premium** for non-US markets, with its source dated like the
+    risk-free rate now is.
+  Noted 06/10/2026.
+
+- [x] **03/10 external review - what was built** - DONE 06/10/2026. Capex fades to the
+  steady state the terminal assumes (GOOGL's terminal step 1.74x -> 1.09x); the workbook
+  mirrors the depreciation split (it was 31% out on AMD); the publisher declines any
+  result the page calls the wrong tool (banks were tilting Crosscheck); the risk-free
+  rate, price and accounts are dated on the page; the PV row lost its growth rate.
+  Refuted on the data: the risk-free rate was ^TNX exactly, correctly scaled. Declined
+  with reasons in the commits: a D&A roll-forward, a revenue fade to terminal g, a 50bp
+  rate alarm, and a check row that would always read about 1.0 now the fade exists.
+
 ## Post-v1
 
 - [ ] **Dividend-discount model for financials.** Banks and insurers have no meaningful
