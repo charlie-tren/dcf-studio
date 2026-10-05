@@ -1,4 +1,5 @@
 import { majorCurrency } from './fx';
+import { isoDay } from './format';
 import type { DataQualityFlag, FiscalYear, Fundamentals, Sourced } from './types';
 import type { RawStatementRow, RawTicker } from './yahoo';
 
@@ -357,6 +358,7 @@ export function normalise(ticker: string, raw: RawTicker): Fundamentals {
     quoteCurrency,
     years,
     price: asNumber(nested(raw.quote.price, ['regularMarketPrice'])) ?? 0,
+    priceAsOf: isoDay(nested(raw.quote.price, ['regularMarketTime'])),
     marketCap,
     rawBeta: asNumber(nested(raw.quote.defaultKeyStatistics, ['beta'])),
     analystRevenue,

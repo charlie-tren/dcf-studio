@@ -1,4 +1,5 @@
 import YahooFinance from 'yahoo-finance2';
+import { isoDay } from './format';
 
 // v4 requires instantiation. The v2 default-export-as-object pattern throws.
 const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
@@ -122,12 +123,15 @@ export async function fetchFxRate(from: string, to: string): Promise<number | nu
 }
 
 /** US 10-year Treasury yield as a decimal. ^TNX quotes in percent. */
-export async function fetchUsTenYear(): Promise<number | null> {
+export async function fetchUsTenYear(): Promise<{ rate: number; asOf: string | null } | null> {
   try {
     const q = await yf.quote('^TNX');
-    const price = (q as { regularMarketPrice?: number }).regularMarketPrice;
-    return typeof price === 'number' ? price / 100 : null;
+    const { regularMarketPrice: price, regularMarketTime: at } =
+      q as { regularMarketPrice?: number; regularMarketTime?: Date | string | number };
+    if (typeof price !== 'number') return null;
+    return { rate: price / 100, asOf: isoDay(at) };
   } catch {
     return null;
   }
 }
+

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseRbaF2, resolveRiskFree, RBA_TEN_YEAR_SERIES_ID } from '@/lib/riskfree';
+import { parseRbaF2, parseRbaF2Dated, resolveRiskFree, RBA_TEN_YEAR_SERIES_ID } from '@/lib/riskfree';
+import { isoDay } from '@/lib/format';
 
 /**
  * Shaped exactly like the real F2 CSV, verified against a live download on
@@ -88,5 +89,43 @@ describe('resolveRiskFree', () => {
     const r = await resolveRiskFree('BHP.AX', deps(null, 4.989));
     expect(r.assumed).toBe(true);
     expect(r.rate).toBeCloseTo(0.042, 10);
+  });
+});
+
+describe('the rate is dated', () => {
+  /**
+   * An external review on 03/10/2026 read the page's 5.28% "US 10-year" as the
+   * 30-year, off an undated quote of its own. It was the 10-year exactly - the
+   * 30-year was 5.63% - but nothing on the page said what day the rate was from,
+   * so there was no way to check. The date now travels with the source label.
+   */
+  it('takes the date of the RBA row the rate came from, as ISO', () => {
+    expect(parseRbaF2Dated(F2_SAMPLE)).toEqual({ rate: expect.closeTo(0.04989, 10), asOf: '2026-07-22' });
+  });
+
+  it('prints the date in the source when the fetcher knows it', async () => {
+    const us = await resolveRiskFree('MSFT', {
+      fetchUsTenYear: async () => ({ rate: 0.05277, asOf: '2026-10-02' }),
+      fetchRbaTenYear: async () => null,
+    });
+    expect(us.source).toBe('US 10-year Treasury (^TNX), 2026-10-02');
+    const au = await resolveRiskFree('BHP.AX', {
+      fetchUsTenYear: async () => null,
+      fetchRbaTenYear: async () => ({ rate: 0.0415, asOf: '2026-10-03' }),
+    });
+    expect(au.source).toBe('Australian Government 10-year (RBA F2), 2026-10-03');
+  });
+
+  it('still accepts a bare rate, and says nothing about a date it was not given', async () => {
+    const r = await resolveRiskFree('MSFT', { fetchUsTenYear: async () => 0.0462, fetchRbaTenYear: async () => null });
+    expect(r.source).toBe('US 10-year Treasury (^TNX)');
+  });
+
+  it('reads a Yahoo timestamp in any of the shapes it arrives in', () => {
+    expect(isoDay('2026-07-29T20:00:01.000Z')).toBe('2026-07-29');
+    expect(isoDay(new Date('2026-10-02T20:00:00Z'))).toBe('2026-10-02');
+    expect(isoDay(1790971200)).toBe('2026-10-02');        // epoch seconds
+    expect(isoDay(undefined)).toBeNull();
+    expect(isoDay('not a date')).toBeNull();
   });
 });

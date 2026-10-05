@@ -39,3 +39,13 @@ export function cagr(series: number[]): number | null {
   const magnitude = ratio ** (1 / years) - 1;
   return first < 0 ? -magnitude : magnitude;
 }
+
+/** A Yahoo timestamp - a Date, an ISO string or epoch seconds - as YYYY-MM-DD. */
+export function isoDay(at: unknown): string | null {
+  if (at === null || at === undefined) return null;
+  const d =
+    at instanceof Date ? at
+      : typeof at === 'number' ? new Date(at < 1e12 ? at * 1000 : at)
+        : new Date(String(at));
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}

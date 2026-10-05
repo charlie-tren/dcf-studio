@@ -84,6 +84,8 @@ export type Fundamentals = {
   years: FiscalYear[];
   /** As quoted, in quote currency display units (pence for GBp). */
   price: number;
+  /** The trading day that price is from, YYYY-MM-DD, where Yahoo says. */
+  priceAsOf: string | null;
   marketCap: number;
   rawBeta: number | null;
   /** Consensus revenue estimates, nearest period first. Empty when uncovered. */

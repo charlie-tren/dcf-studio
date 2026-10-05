@@ -271,3 +271,12 @@ describe('normalise - depreciation of productive assets, split out from D&A', ()
     }
   });
 });
+
+describe('the price carries its date', () => {
+  // Printed in the model strip beside the accounts' year end, so a reader can see
+  // the two inputs are of different ages.
+  it('reads the trading day off the quote', () => {
+    const raw = JSON.parse(readFileSync('tests/fixtures/MSFT.json', 'utf8'));
+    expect(normalise('MSFT', raw).priceAsOf).toBe('2026-07-29');
+  });
+});

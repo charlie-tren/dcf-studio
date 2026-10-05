@@ -75,6 +75,10 @@ export function Headline({ v }: { v: Valuation }) {
           {v.fxRate !== 1
             ? ` · ${v.fundamentals.reportingCurrency} model at ${v.fxRate.toFixed(4)}`
             : ''}
+          {/* Each input dated separately: the price moves daily, the accounts
+              once a year, and one "as at" would claim the freshest for both. */}
+          {v.fundamentals.priceAsOf ? ` · Price ${v.fundamentals.priceAsOf}` : ''}
+          {v.fundamentals.years[0] ? ` · Accounts to ${v.fundamentals.years[0].periodEnd}` : ''}
         </span>
       </p>
     </header>

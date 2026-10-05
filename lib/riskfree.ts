@@ -22,6 +22,35 @@ export type RiskFree = {
   assumed: boolean;
 };
 
+/**
+ * A live reading, with the date it was struck where the source gives one. A bare
+ * number is accepted too, for a source that does not say when.
+ *
+ * The date is printed with the rate. On 03/10/2026 an external review read the
+ * page's 5.28% "US 10-year" as the 30-year, off an undated quote of its own; the
+ * figure was the 10-year exactly (the 30-year was 5.63%), but the page gave no
+ * way to check, because nothing said what day it was from.
+ */
+export type Observation = number | { rate: number; asOf: string | null } | null;
+
+function unpack(o: Observation | undefined): { rate: number | null; asOf: string | null } {
+  if (o === null || o === undefined) return { rate: null, asOf: null };
+  if (typeof o === 'number') return { rate: o, asOf: null };
+  return { rate: o.rate, asOf: o.asOf };
+}
+
+const MONTHS: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
+/** RBA writes 22-Jul-2026; the page uses ISO, like every other date on it. */
+function rbaDateToIso(cell: string): string | null {
+  const m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(cell);
+  const mm = m ? MONTHS[m[2].toLowerCase()] : undefined;
+  return m && mm ? `${m[3]}-${mm}-${m[1].padStart(2, '0')}` : null;
+}
+
 function splitCsvLine(line: string): string[] {
   // F2 quotes some descriptive cells but never embeds a comma in a numeric one,
   // so a simple split plus quote-strip is sufficient and avoids a CSV dependency.
@@ -33,6 +62,11 @@ function splitCsvLine(line: string): string[] {
  * Returns null when the series or any usable observation is missing.
  */
 export function parseRbaF2(csv: string): number | null {
+  return parseRbaF2Dated(csv)?.rate ?? null;
+}
+
+/** The same reading, with the date of the row it came from. */
+export function parseRbaF2Dated(csv: string): { rate: number; asOf: string | null } | null {
   const lines = csv.split(/\r?\n/);
 
   const seriesRow = lines.find((l) => l.includes(RBA_TEN_YEAR_SERIES_ID));
@@ -47,24 +81,24 @@ export function parseRbaF2(csv: string): number | null {
     const raw = cells[column];
     if (raw === undefined || raw === '') continue;
     const value = Number(raw);
-    if (Number.isFinite(value)) return value / 100;
+    if (Number.isFinite(value)) return { rate: value / 100, asOf: rbaDateToIso(cells[0]) };
   }
   return null;
 }
 
-export async function fetchRbaTenYear(): Promise<number | null> {
+export async function fetchRbaTenYear(): Promise<Observation> {
   try {
     const res = await fetch(RBA_F2_URL, { next: { revalidate: 86400 } } as RequestInit);
     if (!res.ok) return null;
-    return parseRbaF2(await res.text());
+    return parseRbaF2Dated(await res.text());
   } catch {
     return null;
   }
 }
 
 export type RiskFreeDeps = {
-  fetchUsTenYear: () => Promise<number | null>;
-  fetchRbaTenYear: () => Promise<number | null>;
+  fetchUsTenYear: () => Promise<Observation>;
+  fetchRbaTenYear: () => Promise<Observation>;
 };
 
 const LIVE_DEPS: RiskFreeDeps = { fetchUsTenYear: yahooUsTenYear, fetchRbaTenYear };
@@ -77,15 +111,23 @@ export async function resolveRiskFree(ticker: string, deps: RiskFreeDeps = LIVE_
   const market = marketFor(ticker);
 
   if (market.riskFreeSource === 'yahoo-tnx') {
-    const rate = await deps.fetchUsTenYear();
+    const { rate, asOf } = unpack(await deps.fetchUsTenYear());
     if (plausible(rate)) {
-      return { rate: rate as number, source: 'US 10-year Treasury (^TNX)', assumed: false };
+      return {
+        rate: rate as number,
+        source: `US 10-year Treasury (^TNX)${asOf ? `, ${asOf}` : ''}`,
+        assumed: false,
+      };
     }
   }
   if (market.riskFreeSource === 'rba') {
-    const rate = await deps.fetchRbaTenYear();
+    const { rate, asOf } = unpack(await deps.fetchRbaTenYear());
     if (plausible(rate)) {
-      return { rate: rate as number, source: 'Australian Government 10-year (RBA F2)', assumed: false };
+      return {
+        rate: rate as number,
+        source: `Australian Government 10-year (RBA F2)${asOf ? `, ${asOf}` : ''}`,
+        assumed: false,
+      };
     }
   }
 
