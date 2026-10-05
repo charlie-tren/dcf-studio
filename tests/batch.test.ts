@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { publishableRatio, guardCoverage } from '@/lib/batch';
+import { readFileSync } from 'node:fs';
+import { declinedByModel, publishableRatio, guardCoverage } from '@/lib/batch';
+import { buildValuation } from '@/lib/valuation';
+import type { RawTicker } from '@/lib/yahoo';
 
 /**
  * The batch that publishes this model's output for Crosscheck to join against.
@@ -40,6 +43,39 @@ describe('publishableRatio', () => {
     expect(publishableRatio(50, 0)).toBeNull();
     expect(publishableRatio(50, NaN)).toBeNull();
     expect(publishableRatio(NaN, 100)).toBeNull();
+  });
+});
+
+describe('declinedByModel', () => {
+  it('declines only on an error flag, never on a warning or a note', () => {
+    expect(declinedByModel([{ severity: 'error' }])).toBe(true);
+    expect(declinedByModel([{ severity: 'warn' }, { severity: 'info' }])).toBe(false);
+    expect(declinedByModel([])).toBe(false);
+  });
+
+  /**
+   * The case that motivated it, through the real engine. A bank's page prints
+   * "Wrong tool", and its ratio used to be published regardless: financials ran at
+   * a median 1.28x against 0.61x for everything else, so they rode a number their
+   * own source disowns into Crosscheck's top fifth at double their weight.
+   */
+  async function from(ticker: string) {
+    const raw: RawTicker = JSON.parse(
+      readFileSync(`tests/fixtures/${ticker.replace('.', '_')}.json`, 'utf8')
+    );
+    return buildValuation(ticker, { scenario: 'base', horizonYears: 5 }, {
+      fetchTicker: async () => raw,
+      fetchFxRate: async () => 1,
+      resolveRiskFree: async () => ({ rate: 0.0462, source: 'test', assumed: false }),
+    });
+  }
+
+  it.each(['CBA.AX', 'RY.TO'])('declines %s, which its own page calls the wrong tool', async (t) => {
+    expect(declinedByModel((await from(t)).flags)).toBe(true);
+  });
+
+  it.each(['MSFT', 'BHP.AX', 'ARB.AX'])('publishes %s, which it values', async (t) => {
+    expect(declinedByModel((await from(t)).flags)).toBe(false);
   });
 });
 

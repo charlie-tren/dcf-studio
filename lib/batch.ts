@@ -11,6 +11,23 @@ import { implausibleResult } from './valuation';
 export const MIN_COVERAGE_SHARE = 0.5;
 
 /**
+ * True where the company's own page refuses to call its result a valuation.
+ *
+ * An `error` flag is the model declining: "Wrong tool" on a bank or insurer, or a
+ * perpetuity that cannot converge. The page prints the refusal; this file used to
+ * publish the number anyway, and Crosscheck ranked it. Financials were the cost:
+ * their median ratio was 1.28x against 0.61x for everything else on 05/10/2026, so
+ * 71 banks and insurers rode a number their own source disowns into a composite
+ * whose top fifth came out 26% Financials against 14% of the universe.
+ *
+ * Same rule as `publishableRatio`, one level up: a row the page disowns must not
+ * reappear as a rank on another site.
+ */
+export function declinedByModel(flags: readonly { severity: string }[]): boolean {
+  return flags.some((f) => f.severity === 'error');
+}
+
+/**
  * Implied value over market price, or null where the pair cannot support a rank.
  *
  * The plausibility test is `implausibleResult` itself rather than a second threshold

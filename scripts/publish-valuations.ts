@@ -27,7 +27,7 @@ import { writeFile, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildValuation } from '../lib/valuation';
-import { publishableRatio, guardCoverage } from '../lib/batch';
+import { declinedByModel, publishableRatio, guardCoverage } from '../lib/batch';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, '..', 'public', 'valuations.json');
@@ -85,10 +85,17 @@ async function main() {
   const started = Date.now();
   let failed = 0;
   let dropped = 0;
+  let declined = 0;
 
   const results = await pool(tickers, CONCURRENCY, async (ticker): Promise<Row | null> => {
     try {
       const v = await buildValuation(ticker, { scenario: 'base', horizonYears: 5 });
+      // Before the ratio: a result the page calls the wrong tool is not a valuation
+      // whatever its number looks like, and a bank's usually looks generous.
+      if (declinedByModel(v.flags)) {
+        declined++;
+        return null;
+      }
       const ratio = publishableRatio(v.valuePerShareQuoted, v.fundamentals.price);
       if (ratio === null) {
         dropped++;
@@ -117,7 +124,8 @@ async function main() {
   const rows = results.filter((r): r is Row => r !== null);
   const secs = (Date.now() - started) / 1000;
   console.log(
-    `valued ${rows.length}, dropped ${dropped} as implausible, ${failed} could not be ` +
+    `valued ${rows.length}, declined ${declined} as the wrong tool, ` +
+      `dropped ${dropped} as implausible, ${failed} could not be ` +
       `modelled, in ${(secs / 60).toFixed(1)} min`
   );
 
@@ -144,6 +152,9 @@ async function main() {
           + 'below market prices, so rank these rather than printing them.',
         attempted: tickers.length,
         published: rows.length,
+        // Counted rather than silently missing, so a consumer can say why a bank has
+        // no reading: the model declined it, which is different from failing on it.
+        declined_by_model: declined,
         dropped_implausible: dropped,
         could_not_model: failed,
         ratios: Object.fromEntries(rows.map((r) => [r.ticker, r.ratio])),
