@@ -12,6 +12,48 @@ function assertLength(name: string, arr: number[], expected: number): void {
  * subtracted. A revenue fall makes changeInNwc negative, which correctly
  * releases cash. There is deliberately no Math.abs anywhere in this file.
  */
+/**
+ * The capex the terminal assumes, as a share of revenue: maintenance at
+ * depreciation, plus the g / ROIC of NOPAT that terminal growth has to be funded
+ * with. The same identity `terminalFcff` capitalises, written as an intensity so
+ * the forecast can arrive at it.
+ */
+export function steadyStateCapexPct(a: Assumptions): number {
+  if (!a.terminalCapexEqualsDA) return a.capexPctRevenue;
+  const margin = a.ebitMargin[a.ebitMargin.length - 1];
+  const amortisationPct = Math.max(a.daPctRevenue - a.depreciationPctRevenue, 0);
+  const nopatPct = (margin + amortisationPct) * (1 - a.taxRate);
+  const roic = Math.max(a.terminalRoic ?? a.wacc, a.wacc);
+  const reinvestmentRate = a.terminalGrowth > 0 ? Math.min(a.terminalGrowth / roic, 0.9) : 0;
+  return Math.min(a.depreciationPctRevenue, a.daPctRevenue) + Math.max(nopatPct, 0) * reinvestmentRate;
+}
+
+/**
+ * Capex intensity for forecast year i (0-based): today's level in year 1, fading
+ * in a straight line to the steady state by the final year.
+ *
+ * Without the fade the model made two assumptions about one company a year apart.
+ * The forecast charged today's capex intensity for every explicit year, and the
+ * terminal then assumed the steady state above, all at once. Measured on the
+ * fixtures 05/10/2026, the cashflow the perpetuity capitalises ran from 0.52x to
+ * 1.24x the final forecast year's, and an external review found GOOGL at 1.74x:
+ * five years of datacentre buildout charged in full, then none. The step ran the
+ * other way for companies spending BELOW depreciation (Shell 0.64x, Stockland
+ * 0.72x), whose forecast years were flattered against their own terminal.
+ *
+ * The terminal is unchanged by this. Only the path into it is, so a heavy
+ * investor gains the years it would plausibly taper and an under-investor loses
+ * the years it was being credited for not replacing its assets.
+ *
+ * Off with the steady-state switch, which is the textbook build that capitalises
+ * the final year as reported - there is nothing to fade towards.
+ */
+export function capexPctForYear(a: Assumptions, i: number): number {
+  const target = steadyStateCapexPct(a);
+  if (a.horizonYears <= 1) return target;
+  return a.capexPctRevenue + (target - a.capexPctRevenue) * (i / (a.horizonYears - 1));
+}
+
 function buildForecast(inputs: DcfInputs, a: Assumptions): ForecastYear[] {
   const years: ForecastYear[] = [];
   let previousRevenue = inputs.baseRevenue;
@@ -21,7 +63,7 @@ function buildForecast(inputs: DcfInputs, a: Assumptions): ForecastYear[] {
     const ebit = revenue * a.ebitMargin[i];
     const nopat = ebit * (1 - a.taxRate);
     const dAndA = revenue * a.daPctRevenue;
-    const capex = revenue * a.capexPctRevenue;
+    const capex = revenue * capexPctForYear(a, i);
     const changeInNwc = (revenue - previousRevenue) * a.nwcPctRevenueChange;
     const fcff = nopat + dAndA - capex - changeInNwc;
 
@@ -251,9 +293,12 @@ export function runDcf(inputs: DcfInputs, a: Assumptions): DcfResult {
 
   const warnings: string[] = [];
   if (gordonTv.blocked) warnings.push(gordonTv.blocked);
-  if (a.terminalCapexEqualsDA && finalYear.capex > finalYear.dAndA * 1.25) {
+  // Today's capex against today's depreciation - the gap the company actually
+  // has. Not the final year's: since the fade, that IS the steady state, growth
+  // investment included, and it would trip this on a company with no gap at all.
+  if (a.terminalCapexEqualsDA && a.capexPctRevenue > a.daPctRevenue * 1.25) {
     warnings.push(
-      `Capital expenditure runs at ${((finalYear.capex / finalYear.revenue) * 100).toFixed(1)}% of revenue against depreciation of ${((finalYear.dAndA / finalYear.revenue) * 100).toFixed(1)}%. A perpetuity has to be a steady state, so the terminal year uses maintenance capex at depreciation and then charges the reinvestment terminal growth requires (g/ROIC of NOPAT). The bridge is shown under Terminal Value.`
+      `Capital expenditure runs at ${(a.capexPctRevenue * 100).toFixed(1)}% of revenue against depreciation of ${(a.daPctRevenue * 100).toFixed(1)}%. A perpetuity has to be a steady state, so the forecast tapers capex to maintenance at depreciation plus the reinvestment terminal growth requires (g/ROIC of NOPAT), and the terminal year carries on from there. The bridge is shown under Terminal Value.`
     );
   }
   if (forecast.some((y) => y.fcff < 0)) {

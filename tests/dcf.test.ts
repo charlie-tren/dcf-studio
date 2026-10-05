@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runDcf } from '@/lib/dcf';
+import { runDcf, steadyStateCapexPct } from '@/lib/dcf';
 import type { Assumptions, DcfInputs } from '@/lib/types';
 
 /** Hand-computed reference model. See the plan for the derivation. */
@@ -267,11 +267,33 @@ describe('runDcf - terminal capex normalisation', () => {
     expect(ss?.capitalisedFcff).toBeCloseTo(r.forecast[4].fcff, 8);
   });
 
-  it('leaves the explicit forecast years untouched', () => {
-    const r = runDcf(REF_INPUTS, HEAVY_INVESTOR);
-    // Only the terminal value is normalised - the visible cashflows still show
-    // the real capex the company is spending.
-    expect(r.forecast[4].capex / r.forecast[4].revenue).toBeCloseTo(0.227, 8);
+  it('shows the real capex in year 1 and arrives at the steady state by the final year', () => {
+    // Until 05/10/2026 this asserted the opposite - that the explicit years carried
+    // today's capex intensity untouched and only the terminal was normalised. That
+    // made two assumptions about one company a year apart: GOOGL's capitalised
+    // cashflow sat 74% above its own final forecast year. Year 1 still shows what
+    // the company is spending; the path then fades to what the terminal assumes.
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.20 });
+    const pct = r.forecast.map((y) => y.capex / y.revenue);
+    expect(pct[0]).toBeCloseTo(0.227, 8);
+    expect(pct[4]).toBeCloseTo(steadyStateCapexPct({ ...HEAVY_INVESTOR, terminalRoic: 0.20 }), 8);
+    // a straight line: equal steps between the two
+    const steps = pct.slice(1).map((p, i) => p - pct[i]);
+    for (const d of steps) expect(d).toBeCloseTo(steps[0], 10);
+  });
+
+  it('meets the terminal: the final year cashflow and the capitalised one agree', () => {
+    // The point of the fade. What is left between them is the tax on
+    // amortisation and the working capital the final year still builds.
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalRoic: 0.20 });
+    const ratio = r.gordon.terminal.steadyState!.capitalisedFcff / r.forecast[4].fcff;
+    expect(ratio).toBeGreaterThan(0.8);
+    expect(ratio).toBeLessThan(1.25);
+  });
+
+  it('does not fade when the steady state is switched off', () => {
+    const r = runDcf(REF_INPUTS, { ...HEAVY_INVESTOR, terminalCapexEqualsDA: false });
+    for (const y of r.forecast) expect(y.capex / y.revenue).toBeCloseTo(0.227, 8);
   });
 
   it('does not inflate a company that under-invests', () => {
@@ -395,8 +417,10 @@ describe('runDcf - the terminal charges working capital once, not twice', () => 
   });
 
   it('leaves the terminal alone when the normalisation is switched off', () => {
-    const s = runDcf(REF_INPUTS, { ...A, terminalCapexEqualsDA: false }).gordon.terminal.steadyState!;
-    expect(s.maintenanceFcff).toBeCloseTo(runDcf(REF_INPUTS, A).forecast[4].fcff, 6);
+    // Against the SAME run's final year. This used to compare with the switched-on
+    // run's, which only coincided while the forecast ignored the switch.
+    const off = runDcf(REF_INPUTS, { ...A, terminalCapexEqualsDA: false });
+    expect(off.gordon.terminal.steadyState!.maintenanceFcff).toBeCloseTo(off.forecast[4].fcff, 6);
   });
 
   it('still floors a loss-maker at zero rather than crediting it cash', () => {

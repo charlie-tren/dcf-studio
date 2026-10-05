@@ -1,5 +1,5 @@
 import { FcffChart } from './FcffChart';
-import { cagr, money, signedPct } from '@/lib/format';
+import { cagr, money, pct, signedPct } from '@/lib/format';
 import type { DcfResult, ForecastYear } from '@/lib/types';
 
 export function ForecastTable({
@@ -18,6 +18,8 @@ export function ForecastTable({
     rule?: boolean;
     /** A growth rate is meaningless for a ratio like the discount factor. */
     noGrowth?: boolean;
+    /** How a cell is printed, where it is not money. */
+    format?: (v: number) => string;
     /** Series to compute growth on, when it differs from what is displayed. */
     growthOn?: (y: ForecastYear) => number;
   }[] = [
@@ -29,6 +31,15 @@ export function ForecastTable({
     // computed on the magnitude: capex rising from 67bn to 108bn is +12.5%
     // growth in spending, not -12.5%.
     { label: 'Less capital expenditure', pick: (y) => -y.capex, growthOn: (y) => y.capex },
+    // The capex path, which fades from today's intensity to the steady state the
+    // terminal assumes. Shown because it is the largest assumption in the explicit
+    // years and it moves year by year.
+    {
+      label: 'Capex, % of revenue',
+      pick: (y) => y.capex / y.revenue,
+      noGrowth: true,
+      format: (v) => pct(v, 1),
+    },
     {
       label: 'Less increase in working capital',
       pick: (y) => -y.changeInNwc,
@@ -36,7 +47,9 @@ export function ForecastTable({
     },
     { label: 'Free cashflow to firm', pick: (y) => y.fcff, emphasis: true },
     { label: 'Discount factor', pick: (y) => y.discountFactor, noGrowth: true },
-    { label: 'Present value', pick: (y) => y.presentValue, emphasis: true },
+    // No growth rate: a CAGR of discounted values mixes the business growing with
+    // the discounting shrinking it, and means neither.
+    { label: 'Present value', pick: (y) => y.presentValue, emphasis: true, noGrowth: true },
   ];
 
   return (
@@ -72,7 +85,7 @@ export function ForecastTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ label, pick, emphasis, rule, noGrowth, growthOn }) => {
+            {rows.map(({ label, pick, emphasis, rule, noGrowth, growthOn, format }) => {
               const growth = noGrowth ? null : cagr(dcf.forecast.map(growthOn ?? pick));
               return (
                 <tr
@@ -97,7 +110,11 @@ export function ForecastTable({
                           emphasis ? 'font-medium text-[var(--text)]' : 'text-[var(--text-dim)]'
                         } ${value < 0 ? 'text-[var(--negative)]' : ''}`}
                       >
-                        {label === 'Discount factor' ? value.toFixed(4) : money(value, currency)}
+                        {format
+                          ? format(value)
+                          : label === 'Discount factor'
+                            ? value.toFixed(4)
+                            : money(value, currency)}
                       </td>
                     );
                   })}

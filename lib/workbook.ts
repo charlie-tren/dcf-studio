@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { capexPctForYear, steadyStateCapexPct } from './dcf';
 import { majorCurrency, quoteConversionFactor } from './fx';
 import { FLAG_LABEL, FLAG_ORDER } from './types';
 import type { Valuation } from './valuation';
@@ -194,6 +195,11 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     terminalGrowth: 12,
     exitMultiple: 13,
     roic: 14,
+    // The recurring half of D&A. The terminal replaces depreciation and lets the
+    // amortisation of acquired intangibles run off, so the sheet needs the split
+    // the engine has: without it AMD's workbook recalculated to 24.92 a share
+    // against the page's 36.33, and Broadcom's to 104.32 against 130.75.
+    depreciation: 15,
   };
   label(a, rows.growth, 'Revenue growth');
   label(a, rows.margin, 'EBIT margin');
@@ -204,6 +210,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   label(a, rows.terminalGrowth, 'Terminal growth');
   label(a, rows.exitMultiple, 'Exit EV/EBITDA');
   label(a, rows.roic, 'Terminal ROIC');
+  label(a, rows.depreciation, 'Depreciation alone, % of revenue');
 
   // A flat driver is one input; a per-year path is one input per year, which is
   // why growth and margin are written to the Forecast sheet instead when they
@@ -213,6 +220,14 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   inputCell(a, `B${rows.tax}`, v.assumptions.taxRate, RATE);
   inputCell(a, `B${rows.da}`, v.assumptions.daPctRevenue, RATE);
   inputCell(a, `B${rows.capex}`, v.assumptions.capexPctRevenue, RATE);
+  note(a.getCell(`C${rows.capex}`), 'Year 1. Fades to the steady state by the final year');
+  inputCell(a, `B${rows.depreciation}`, v.assumptions.depreciationPctRevenue, RATE);
+  note(
+    a.getCell(`C${rows.depreciation}`),
+    v.assumptions.depreciationPctRevenue < v.assumptions.daPctRevenue
+      ? 'The rest of D&A is amortisation of acquired intangibles, which runs off'
+      : 'The accounts do not separate it from amortisation'
+  );
   inputCell(a, `B${rows.nwc}`, v.assumptions.nwcPctRevenueChange, RATE);
   inputCell(a, `B${rows.terminalGrowth}`, v.assumptions.terminalGrowth, RATE);
   inputCell(a, `B${rows.exitMultiple}`, v.assumptions.exitMultiple, MULTIPLE);
@@ -342,6 +357,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     df: 14,
     pv: 15,
   };
+  const memo = { capexPct: 19, target: 20 };
   f.getCell(`A${r.header}`).value = 'Year';
   f.getCell(`A${r.header}`).font = { bold: true };
   for (let i = 0; i < n; i++) {
@@ -394,12 +410,26 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
       }
     }
 
+    // Capex intensity for this year: year 1 at the Assumptions input, fading in a
+    // straight line to the steady-state cell by the final year. The same path as
+    // capexPctForYear in lib/dcf.ts, written as a formula so editing the input
+    // moves every year of it.
+    formulaCell(
+      f,
+      `${c}${memo.capexPct}`,
+      n > 1
+        ? `Assumptions!$B$${rows.capex}+($B$${memo.target}-Assumptions!$B$${rows.capex})*${i}/${n - 1}`
+        : `$B$${memo.target}`,
+      RATE,
+      capexPctForYear(v.assumptions, i)
+    );
+
     const priorRevenue = prev ? `${prev}${r.revenue}` : `Assumptions!B${base.revenue}`;
     formulaCell(f, `${c}${r.revenue}`, `${priorRevenue}*(1+${c}${r.growth})`, MONEY, fy.revenue);
     formulaCell(f, `${c}${r.ebit}`, `${c}${r.revenue}*${c}${r.margin}`, MONEY, fy.ebit);
     formulaCell(f, `${c}${r.nopat}`, `${c}${r.ebit}*(1-Assumptions!B${rows.tax})`, MONEY, fy.nopat);
     formulaCell(f, `${c}${r.da}`, `${c}${r.revenue}*Assumptions!B${rows.da}`, MONEY, fy.dAndA);
-    formulaCell(f, `${c}${r.capex}`, `-${c}${r.revenue}*Assumptions!B${rows.capex}`, MONEY, -fy.capex);
+    formulaCell(f, `${c}${r.capex}`, `-${c}${r.revenue}*${c}${memo.capexPct}`, MONEY, -fy.capex);
     formulaCell(
       f,
       `${c}${r.nwc}`,
@@ -442,6 +472,24 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   // says it is the sum of the row above, not another year.
   pvTotal.border = { top: { style: 'thin' }, bottom: { style: 'double' } };
   f.getCell('A17').border = { top: { style: 'thin' } };
+
+  label(f, memo.capexPct, 'Capital expenditure, % of revenue');
+  label(f, memo.target, 'Steady-state capital expenditure, % of revenue');
+  // Maintenance at depreciation plus the g / ROIC of NOPAT growth has to be funded
+  // with - what the terminal assumes, so the final year arrives at it. Equal to the
+  // year-1 input when the steady state is switched off, which flattens the path.
+  formulaCell(
+    f,
+    `B${memo.target}`,
+    `IF(Assumptions!$B$${base.steadyState}=0,Assumptions!$B$${rows.capex},` +
+      `MIN(Assumptions!$B$${rows.depreciation},Assumptions!$B$${rows.da})` +
+      `+MAX((${lastCol}${r.margin}+MAX(Assumptions!$B$${rows.da}-Assumptions!$B$${rows.depreciation},0))` +
+      `*(1-Assumptions!$B$${rows.tax}),0)` +
+      `*IF(Assumptions!$B$${rows.terminalGrowth}<=0,0,` +
+      `MIN(Assumptions!$B$${rows.terminalGrowth}/MAX(Assumptions!$B$${rows.roic},Assumptions!$B$${w.wacc}),0.9)))`,
+    RATE,
+    steadyStateCapexPct(v.assumptions)
+  );
 
   // ----------------------------------------------------------------- Valuation
   const val = wb.addWorksheet('Valuation');
@@ -495,7 +543,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     perShare: 14,
   };
   label(val, t.finalFcff, 'Final year free cashflow');
-  label(val, t.maintenance, 'Net operating profit after tax (capex at depreciation)');
+  label(val, t.maintenance, 'Operating profit before amortisation, after tax');
   label(val, t.reinvestRate, 'Reinvestment rate (g / ROIC)');
   label(val, t.reinvest, 'Less reinvestment to fund terminal growth');
   label(val, t.capitalised, 'Cashflow capitalised');
@@ -534,7 +582,13 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   formulaCell(
     val,
     `B${t.maintenance}`,
-    `IF(${steady}=0,B${t.finalFcff},B${t.finalFcff}-Forecast!${lastCol}${r.capex}-Forecast!${lastCol}${r.da}-Forecast!${lastCol}${r.nwc})`,
+    // EBITA, taxed: depreciation stays in because worn-out plant has to be
+    // replaced, amortisation comes out because an acquisition is not re-bought
+    // every year. The working capital is not charged here either, since the
+    // reinvestment below funds ALL growth investment. Same as terminalFcff.
+    `IF(${steady}=0,B${t.finalFcff},(Forecast!${lastCol}${r.ebit}+MAX(Forecast!${lastCol}${r.da}` +
+      `-MIN(Assumptions!B${rows.depreciation}*Forecast!${lastCol}${r.revenue},Forecast!${lastCol}${r.da}),0))` +
+      `*(1-Assumptions!B${rows.tax}))`,
     MONEY,
     ss?.maintenanceFcff ?? finalYear.fcff
   );
@@ -554,7 +608,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   formulaCell(
     val,
     `B${t.reinvest}`,
-    `-MAX(Forecast!${lastCol}${r.nopat},0)*B${t.reinvestRate}`,
+    `-MAX(B${t.maintenance},0)*B${t.reinvestRate}`,
     MONEY,
     -(ss?.reinvestment ?? 0)
   );

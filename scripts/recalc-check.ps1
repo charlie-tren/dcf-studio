@@ -23,7 +23,10 @@
 #>
 param(
   [int]$Port = 3120,
-  [string[]]$Tickers = @('MSFT','SHEL.L','CBA.AX','MSB.AX','SGP.AX','RY.TO','7203.T','ARB.AX','BHP.AX','NPN.JO'),
+  # AMD and AVGO carry large acquisition amortisation, so their depreciation and
+  # D&A differ. None of the first ten does, which is how the workbook ran 31% out
+  # on AMD for weeks with this check passing: it never crossed that axis.
+  [string[]]$Tickers = @('MSFT','SHEL.L','CBA.AX','MSB.AX','SGP.AX','RY.TO','7203.T','ARB.AX','BHP.AX','NPN.JO','AMD','AVGO','GOOGL'),
   # The engine branches on these and the sheet has to branch with it. Sweeping
   # tickers alone missed three divergences: the steady-state toggle off, a
   # negative terminal growth, and a WACC override, which the sheet used to

@@ -26,7 +26,8 @@ const SLIDERS: Slider[] = [
   { key: 'terminalGrowth', short: 'tg', label: 'Growth after the forecast', min: -0.01, max: 0.05, step: 0.0025, asPercent: true },
   { key: 'exitMultiple', short: 'em', label: 'Exit EV/EBITDA', min: 2, max: 25, step: 0.5, asPercent: false },
   { key: 'taxRate', short: 'tax', label: 'Tax rate', min: 0, max: 0.5, step: 0.005, asPercent: true },
-  { key: 'capexPctRevenue', short: 'cx', label: 'Capex, % of revenue', min: 0, max: 0.4, step: 0.0025, asPercent: true },
+  // Year 1 only: the forecast fades it to the steady state by the final year.
+  { key: 'capexPctRevenue', short: 'cx', label: 'Capex in year 1, % of revenue', min: 0, max: 0.4, step: 0.0025, asPercent: true },
   { key: 'daPctRevenue', short: 'da', label: 'Depreciation, % of revenue', min: 0, max: 0.6, step: 0.0025, asPercent: true },
   { key: 'nwcPctRevenueChange', short: 'nwc', label: 'Working capital, % of revenue growth', min: -1, max: 1, step: 0.01, asPercent: true },
 ];

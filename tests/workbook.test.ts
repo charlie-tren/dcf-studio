@@ -223,9 +223,25 @@ describe('workbook reconciles to the site', () => {
     const equityWeight = mcap / (mcap + debt);
     const wacc = equityWeight * coe + (1 - equityWeight) * cod * (1 - tax);
 
-    // The forecast chain, reading per-year growth and margin from the sheet.
+    // The capex path: year 1 at the input, fading to the steady state the terminal
+    // assumes by the final year. Mirrors capexPctForYear in lib/dcf.ts.
+    const depPct = A('B15');
+    const steady = A('B33') === 1;
     const n = v.assumptions.horizonYears;
+    const lastCol = String.fromCharCode('B'.charCodeAt(0) + n - 1);
+    const lastMarginCell = wb.getWorksheet('Forecast')!.getCell(`${lastCol}7`).value;
+    const lastMargin =
+      typeof lastMarginCell === 'number' ? lastMarginCell : v.assumptions.ebitMargin[n - 1];
+    const rr = terminalGrowth <= 0 ? 0 : Math.min(terminalGrowth / Math.max(roic, wacc), 0.9);
+    const target = steady
+      ? Math.min(depPct, daPct) +
+        Math.max((lastMargin + Math.max(daPct - depPct, 0)) * (1 - tax), 0) * rr
+      : capexPct;
+    const capexFor = (i: number) => (n > 1 ? capexPct + (target - capexPct) * (i / (n - 1)) : target);
+
+    // The forecast chain, reading per-year growth and margin from the sheet.
     let prevRevenue = baseRevenue;
+    let finalRevenue = 0;
     let pvExplicit = 0;
     let finalFcff = 0;
     let finalNwc = 0;
@@ -247,13 +263,14 @@ describe('workbook reconciles to the site', () => {
       const ebit = revenue * margin;
       const nopat = ebit * (1 - tax);
       const da = revenue * daPct;
-      const capex = revenue * capexPct;
+      const capex = revenue * capexFor(i);
       const nwc = (revenue - prevRevenue) * nwcPct;
       const fcff = nopat + da - capex - nwc;
       const df = 1 / (1 + wacc) ** (i + 1 - 0.5 * midYear);
 
       pvExplicit += fcff * df;
       prevRevenue = revenue;
+      finalRevenue = revenue;
       finalFcff = fcff;
       finalNopat = nopat;
       finalNwc = nwc;
@@ -266,11 +283,18 @@ describe('workbook reconciles to the site', () => {
     // mirrored deliberately: this harness omitted them, which is precisely why
     // a loss-maker's reinvestment credit and a blocked perpetuity both got past
     // a suite that claimed to reconcile the sheet to the engine.
-    // + finalNwc, so this is NOPAT: the reinvestment charge below funds the
-    // working capital too. See terminalFcff in lib/dcf.ts.
-    const maintenance = finalFcff + finalCapex - finalDa + finalNwc;
-    const reinvestRate = Math.min(terminalGrowth / Math.max(roic, wacc), 0.9);
-    const capitalised = Math.max(maintenance - Math.max(finalNopat, 0) * reinvestRate, 0);
+    // EBITA, taxed: depreciation stays, the amortisation of acquired intangibles
+    // runs off. This harness used NOPAT on EBIT, which matched the sheet only
+    // because no ticker here separates the two - AMD's workbook was 31% out.
+    // See terminalFcff in lib/dcf.ts.
+    void finalCapex; void finalNwc; void finalNopat;
+    const amortisation = Math.max(finalDa - Math.min(depPct * finalRevenue, finalDa), 0);
+    const maintenance = steady ? (finalEbit + amortisation) * (1 - tax) : finalFcff;
+    const reinvestRate = steady ? rr : 0;
+    const capitalised =
+      !steady || terminalGrowth <= 0
+        ? maintenance
+        : Math.max(maintenance - Math.max(maintenance, 0) * reinvestRate, 0);
     const tv =
       terminalGrowth >= wacc
         ? 0
@@ -385,7 +409,9 @@ describe('workbook reconciles to the site', () => {
     // open. Read the FORMULA. Same miss as the FX conversion cell.
     const v = await valuationFor('MSB.AX');
     const wb = await open(v);
-    expect(formula(wb, 'Valuation', 'B7')).toMatch(/^-MAX\(Forecast!F9,0\)\*B6$/);
+    // Charged on the terminal NOPAT row (before amortisation), not the final
+    // year's NOPAT on EBIT - the two differ for any company with an acquisition.
+    expect(formula(wb, 'Valuation', 'B7')).toMatch(/^-MAX\(B5,0\)\*B6$/);
   });
 
   it('bridges enterprise to equity value on both terminal methods', async () => {
