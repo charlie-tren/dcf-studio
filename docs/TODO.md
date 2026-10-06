@@ -90,18 +90,22 @@
   methodology page promises. Proven discriminating: perturbing a solved driver by 10% moves
   the resulting price about 10% off the market, so the check can fail.
 
-- [ ] **The three P2 items left from the 03/10 external review.** Logged rather than
-  built, because none is a defect and each changes a documented default:
-  - **Cost of debt from a synthetic rating** (interest coverage to a spread, as in
-    Damodaran's table) instead of flooring at the risk-free rate. The best of the three:
-    the floor is right for a bank whose interest expense includes deposits, and wrong for
-    a leveraged industrial whose real borrowing cost sits well above it.
-  - **Sector-aware exit-multiple band.** The 3-20x clamp applies to the DEFAULT only; the
-    slider already goes to 25x, so this is about the starting point, not a cap a reader is
-    stuck with.
-  - **Country equity risk premium** for non-US markets, with its source dated like the
-    risk-free rate now is.
-  Noted 06/10/2026.
+- [x] **The three P2 items left from the 03/10 external review** - CLOSED 06/10/2026.
+  - **Cost of debt from a synthetic rating** - DONE. The floor is now the risk-free plus
+    the spread for the rating interest cover implies (Damodaran, January 2026), capped
+    at the 200bp fallback. An 800bp cap was tried first and rejected on the population:
+    Intel, Boeing and Baxter went to 13% debt while rated investment grade. Measured
+    across Crosscheck's 610 with `scripts/inspect-cost-of-debt.ts`: 396 of 484 move,
+    median +55bp, rank correlation of the published ratio 0.995.
+  - **Country equity risk premium** - MIS-SCOPED. Every market already carries its own
+    ERP in `lib/markets.ts` (US 5.5%, India 8%, HK 7%...). What the review was really
+    missing is a source and a date for them; those are hand-set, within the range
+    practitioners use, and moving them to Damodaran's implied 4.3% mature premium
+    would lift every headline value on the site by a fifth. Left as set; revisit only
+    if the model's calibration against market prices is reopened.
+  - **Sector-aware exit-multiple band** - DECLINED. The exit multiple is the company's
+    own EV/EBITDA, and the 3-20x band only bites on the few names outside it; the exit
+    method is the second opinion, not the headline, and the slider goes to 25x.
 
 - [x] **03/10 external review - what was built** - DONE 06/10/2026. Capex fades to the
   steady state the terminal assumes (GOOGL's terminal step 1.74x -> 1.09x); the workbook

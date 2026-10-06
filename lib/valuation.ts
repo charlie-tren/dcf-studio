@@ -138,6 +138,7 @@ export async function buildValuation(
     interestExpense: latest.interestExpense?.value ?? null,
     priorTotalDebt: prior.totalDebt.value,
     taxRate: provisional.assumptions.taxRate,
+    ebit: latest.ebit.value,
   });
 
   const scenario = buildScenario(fundamentals, request.scenario, request.horizonYears, wacc.wacc);

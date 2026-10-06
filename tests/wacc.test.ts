@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWacc, BETA_FLOOR, BETA_CEILING } from '@/lib/wacc';
+import { buildWacc, syntheticSpread, BETA_FLOOR, BETA_CEILING } from '@/lib/wacc';
 import { implausibleResult } from '@/lib/valuation';
 
 const BASE = {
@@ -64,6 +64,58 @@ describe('buildWacc', () => {
     const w = buildWacc({ ...BASE, interestExpense: 5 });
     expect(w.costOfDebt).toBeCloseTo(0.042, 10);
     expect(w.costOfDebtSource).toMatch(/floor/i);
+  });
+
+  // The floor is the risk-free plus the spread a coverage-implied rating carries
+  // (Damodaran, January 2026). Until 06/10/2026 it was the risk-free rate alone,
+  // which priced any company with cheap legacy debt as if it were the government.
+  describe('synthetic-rating floor', () => {
+    it('lifts cheap book debt to the spread its interest cover implies', () => {
+      // 5 on 2000 is 0.25%, far under the risk-free; cover 11 / 5 = 2.2x is BB.
+      const w = buildWacc({ ...BASE, interestExpense: 5, ebit: 11 });
+      expect(w.costOfDebt).toBeCloseTo(0.042 + 0.0184, 10);
+      expect(w.costOfDebtSource).toMatch(/BB rating at 2\.2x/);
+    });
+
+    it('gives a heavily covered company only the AAA spread', () => {
+      const w = buildWacc({ ...BASE, interestExpense: 5, ebit: 1000 });
+      expect(w.costOfDebt).toBeCloseTo(0.042 + 0.004, 10);
+    });
+
+    it('keeps a real borrowing cost that is already above the floor', () => {
+      // 10% book cost at 10x cover: the company's own number stands.
+      const w = buildWacc({ ...BASE, interestExpense: 200, ebit: 2000 });
+      expect(w.costOfDebt).toBeCloseTo(0.10, 10);
+      expect(w.costOfDebtSource).toMatch(/interest expense/i);
+    });
+
+    it('caps a weak year at the fallback spread, not the default-risk end of the table', () => {
+      // Negative EBIT reads as D (1900bp). At an 800bp cap Intel, Boeing and Baxter
+      // all went to 13% debt while rated investment grade.
+      const w = buildWacc({ ...BASE, interestExpense: 5, ebit: -50 });
+      expect(w.costOfDebt).toBeCloseTo(0.042 + 0.02, 10);
+      expect(w.costOfDebtSource).toMatch(/capped at 200bp/);
+    });
+
+    it('still lets a company that really pays a high-yield rate keep it', () => {
+      // 9% book cost on weak cover: above the capped floor, under the ceiling.
+      const w = buildWacc({ ...BASE, interestExpense: 180, ebit: 150 });
+      expect(w.costOfDebt).toBeCloseTo(0.09, 10);
+    });
+
+    it('leaves the bank guard alone: coverage on deposit interest is no better than the rate', () => {
+      const w = buildWacc({ ...BASE, interestExpense: 500, ebit: 100 });
+      expect(w.costOfDebt).toBeCloseTo(0.042 + 0.02, 10);
+      expect(w.costOfDebtSource).toMatch(/not a credible funding cost/i);
+    });
+
+    it('reads the table as Damodaran writes it: AAA is strictly above 8.5x', () => {
+      expect(syntheticSpread(8.5).rating).toBe('AA');
+      expect(syntheticSpread(8.51).rating).toBe('AAA');
+      expect(syntheticSpread(0).rating).toBe('D');
+      expect(syntheticSpread(2.2).spread).toBeCloseTo(0.0184, 10);
+      expect(syntheticSpread(1.6).spread).toBeCloseTo(0.02, 10);
+    });
   });
 
   it('falls back to a default spread when interest expense is unavailable', () => {

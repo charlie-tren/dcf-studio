@@ -52,8 +52,11 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Two guards apply, because reported inputs are sometimes not what they claim to be. Beta is
           clamped to a range of 0.3 to 2.5: reported betas are occasionally negative, and a cost of
-          equity below the risk-free rate is not a defensible discount rate. The cost of debt is
-          floored at the risk-free rate and capped at 800bp above it - beyond that, interest expense
+          equity below the risk-free rate is not a defensible discount rate. The cost of debt never
+          falls below what a lender would charge for the company&apos;s interest cover: the risk-free
+          rate plus the default spread for the rating that cover implies (Damodaran&apos;s table,
+          January 2026), so a company still paying 2020&apos;s coupons is not priced like the
+          government. It is capped at 800bp above the risk-free rate - beyond that, interest expense
           and reported debt are measuring different things rather than the company being distressed,
           which is common for banks whose interest expense includes deposits that total debt
           excludes.

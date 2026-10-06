@@ -39,6 +39,54 @@ const DEFAULT_DEBT_SPREAD = 0.02;
  */
 const MAX_DEBT_SPREAD = 0.08;
 
+/**
+ * Interest coverage (EBIT / interest expense) to a default spread, for large
+ * non-financial firms. Damodaran, "Ratings, Interest Coverage Ratios and Default
+ * Spread", January 2026. Each row is [coverage above which it applies, rating,
+ * spread], best first.
+ *
+ * Why: the floor used to be the risk-free rate itself, which prices every
+ * company's debt as if it were the government's whenever its book interest runs
+ * cheap - legacy fixed-rate paper issued in 2020-21, say. That is right for
+ * nobody but a sovereign. A synthetic rating floors it at what a lender would
+ * charge a company with that coverage today. Raised by the 03/10/2026 review.
+ */
+export const COVERAGE_SPREADS: readonly (readonly [number, string, number])[] = [
+  [8.5, 'AAA', 0.004],
+  [6.5, 'AA', 0.0055],
+  [5.5, 'A+', 0.007],
+  [4.25, 'A', 0.0078],
+  [3, 'A-', 0.0089],
+  [2.5, 'BBB', 0.0111],
+  [2.25, 'BB+', 0.0138],
+  [2, 'BB', 0.0184],
+  [1.75, 'B+', 0.0275],
+  [1.5, 'B', 0.0321],
+  [1.25, 'B-', 0.0509],
+  [0.8, 'CCC', 0.0885],
+  [0.65, 'CC', 0.1261],
+  [0.2, 'C', 0.16],
+  [-Infinity, 'D', 0.19],
+];
+
+/**
+ * The rating and spread an interest coverage implies, capped at DEFAULT_DEBT_SPREAD.
+ *
+ * Why the cap is the 200bp the model assumes when it cannot tell, and not the
+ * 800bp ceiling on a real book rate: one year's cover is a noisy read of credit
+ * quality. Capped at 800bp, across Crosscheck's 610 on 06/10/2026, every company
+ * with a bad year hit it - Intel, Boeing and Baxter all went to 13% debt while
+ * rated investment grade, and Baxter's ratio fell 68%. The floor exists to stop
+ * the risk-free rate being charged to companies; charging them more than the
+ * fallback on a single ratio is a different claim the data cannot carry. A
+ * company actually paying more than this keeps its own rate, up to the ceiling.
+ */
+export function syntheticSpread(coverage: number): { rating: string; spread: number; capped: boolean } {
+  const row = COVERAGE_SPREADS.find(([above]) => coverage > above) ?? COVERAGE_SPREADS[COVERAGE_SPREADS.length - 1];
+  const spread = Math.min(row[2], DEFAULT_DEBT_SPREAD);
+  return { rating: row[1], spread, capped: spread < row[2] };
+}
+
 export type WaccArgs = {
   riskFree: RiskFree;
   equityRiskPremium: number;
@@ -49,6 +97,8 @@ export type WaccArgs = {
   /** Prior-year total debt, for the average denominator. */
   priorTotalDebt: number;
   taxRate: number;
+  /** Latest operating income, for the coverage ratio. Null leaves the floor at the risk-free rate. */
+  ebit?: number | null;
 };
 
 function resolveBeta(
@@ -77,10 +127,25 @@ function resolveCostOfDebt(args: WaccArgs): { rate: number; source: string } {
     };
   }
   const implied = args.interestExpense / averageDebt;
+  const ceiling = args.riskFree.rate + MAX_DEBT_SPREAD;
+  // The ceiling is checked first and keeps its fixed fallback: a bank's interest
+  // line includes deposits, so a coverage ratio built on it would be as wrong as
+  // the implied rate that tripped the ceiling.
+  if (implied <= ceiling && args.ebit !== null && args.ebit !== undefined && args.interestExpense > 0) {
+    const coverage = args.ebit / args.interestExpense;
+    const synth = syntheticSpread(coverage);
+    const floor = args.riskFree.rate + synth.spread;
+    if (implied < floor) {
+      const bp = Math.round(synth.spread * 10000);
+      return {
+        rate: floor,
+        source: `Risk-free + ${bp}bp, the spread for a ${synth.rating} rating at ${coverage.toFixed(1)}x interest cover${synth.capped ? `, capped at ${Math.round(DEFAULT_DEBT_SPREAD * 10000)}bp because one year's cover is too noisy to charge more` : ''}. Book interest / average debt was lower, at ${(implied * 100).toFixed(1)}%.`,
+      };
+    }
+  }
   if (implied < args.riskFree.rate) {
     return { rate: args.riskFree.rate, source: 'Floored at the risk-free rate (implied cost of debt was lower)' };
   }
-  const ceiling = args.riskFree.rate + MAX_DEBT_SPREAD;
   if (implied > ceiling) {
     return {
       rate: args.riskFree.rate + DEFAULT_DEBT_SPREAD,
