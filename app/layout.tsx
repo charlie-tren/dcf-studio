@@ -24,10 +24,16 @@ const SITE = new URL("https://dcf.charlietrenorden.com");
 const DESCRIPTION =
   "Type a company. Get a discounted cashflow valuation built from its reported financials, with every assumption shown.";
 
+/* Written for search and AI answer engines and never shown to a reader (07/10/2026).
+   Kept apart from DESCRIPTION, which tools/make_card.py prints onto the share
+   card and og/twitter repeat, so the card keeps the line people see. */
+const META_DESCRIPTION =
+  "Free DCF calculator for listed companies: a discounted cash flow valuation built from reported financials, with WACC, terminal value, sensitivity table and a reverse DCF. ASX, US, London, Tokyo and more.";
+
 export const metadata: Metadata = {
   metadataBase: SITE,
   title: "DCF Studio",
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: { canonical: "/" },
   /* og-card.png is built by tools/make_card.py out of globals.css, and the
      width/height are declared because X and Slack reserve the slot before the
