@@ -118,8 +118,33 @@ export async function buildValuation(
     throw new Error(`No annual financial statements available for ${ticker}.`);
   }
 
-  const market = marketFor(ticker);
   const riskFree = await deps.resolveRiskFree(ticker);
+  const quoteMajor = majorCurrency(fundamentals.quoteCurrency);
+  const fxRate =
+    quoteMajor === fundamentals.reportingCurrency
+      ? 1
+      : (await deps.fetchFxRate(fundamentals.reportingCurrency, quoteMajor)) ?? 1;
+  return valueFundamentals(fundamentals, riskFree, fxRate, request);
+}
+
+/**
+ * Everything after the fetch: the model itself, on fundamentals supplied by the caller.
+ *
+ * Split out of buildValuation (07/10/2026) so Crosscheck can rebuild this model's
+ * history from SEC filings as they stood at past dates (crosscheck/dcf_history.py via
+ * scripts/value-history.ts) and run the SAME code the live page runs, rather than a
+ * second implementation that drifts. Synchronous and network-free by construction.
+ */
+export function valueFundamentals(
+  fundamentals: Fundamentals,
+  riskFree: RiskFree,
+  fxRate: number,
+  request: ValuationRequest
+): Valuation {
+  if (fundamentals.years.length === 0) {
+    throw new Error(`No annual financial statements available for ${fundamentals.ticker}.`);
+  }
+  const market = marketFor(fundamentals.ticker);
   const latest = fundamentals.years[0];
   const prior = fundamentals.years[1] ?? latest;
 
@@ -160,12 +185,6 @@ export async function buildValuation(
   });
 
   // One conversion, at the very end. Everything above is in reporting currency.
-  const quoteMajor = majorCurrency(fundamentals.quoteCurrency);
-  const fxRate =
-    quoteMajor === fundamentals.reportingCurrency
-      ? 1
-      : (await deps.fetchFxRate(fundamentals.reportingCurrency, quoteMajor)) ?? 1;
-
   const fxContext = {
     reportingCurrency: fundamentals.reportingCurrency,
     quoteCurrency: fundamentals.quoteCurrency,
