@@ -123,7 +123,7 @@ function resolveCostOfDebt(args: WaccArgs): { rate: number; source: string } {
   if (args.interestExpense === null || averageDebt <= 0) {
     return {
       rate: args.riskFree.rate + DEFAULT_DEBT_SPREAD,
-      source: `Assumed: risk-free + ${(DEFAULT_DEBT_SPREAD * 100).toFixed(0)}bp (interest expense not reported)`,
+      source: `Assumed: risk-free + ${Math.round(DEFAULT_DEBT_SPREAD * 10000)}bp (interest expense not reported)`,
     };
   }
   const implied = args.interestExpense / averageDebt;
@@ -149,7 +149,7 @@ function resolveCostOfDebt(args: WaccArgs): { rate: number; source: string } {
   if (implied > ceiling) {
     return {
       rate: args.riskFree.rate + DEFAULT_DEBT_SPREAD,
-      source: `Implied cost of debt of ${(implied * 100).toFixed(1)}% is not a credible funding cost, so risk-free + ${(DEFAULT_DEBT_SPREAD * 100).toFixed(0)}bp is assumed instead. Interest expense and reported debt are measuring different things - common for banks, whose interest expense includes deposits that total debt excludes.`,
+      source: `Implied cost of debt of ${(implied * 100).toFixed(1)}% is not a credible funding cost, so risk-free + ${Math.round(DEFAULT_DEBT_SPREAD * 10000)}bp is assumed instead. Interest expense and reported debt are measuring different things - common for banks, whose interest expense includes deposits that total debt excludes.`,
     };
   }
   return { rate: implied, source: 'Interest expense / average total debt' };

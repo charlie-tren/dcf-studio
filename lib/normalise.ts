@@ -114,6 +114,31 @@ function changeInNwc(
 }
 
 /**
+ * Total debt, falling back to its components before concluding there is none.
+ *
+ * Yahoo's totalDebt is intermittent on some names: Naspers came back at 0 in one
+ * pull and 18.0bn in the next, which flipped it between net cash and net debt and
+ * moved the value from +15.08 to -7.87 a share. The components are usually there
+ * when the total is not, and they sum to it exactly where both exist (Microsoft:
+ * 57,589m + 2,999m = 60,588m).
+ */
+function totalDebt(row: RawStatementRow): Sourced<number> | null {
+  const reported = firstOf(row, ['totalDebt']);
+  if (reported) return reported;
+  for (const [long, current] of [
+    ['longTermDebtAndCapitalLeaseObligation', 'currentDebtAndCapitalLeaseObligation'],
+    ['longTermDebt', 'currentDebt'],
+  ]) {
+    const l = num(row, long);
+    const c = num(row, current);
+    if (l !== null || c !== null) {
+      return derivedValue((l ?? 0) + (c ?? 0), `Total debt not reported: ${long} + ${current}`);
+    }
+  }
+  return null;
+}
+
+/**
  * Capital the business actually has at work, for ROIC. Prefers the reported
  * line; otherwise equity + debt - cash, which is the standard construction.
  */
@@ -122,7 +147,7 @@ function investedCapital(row: RawStatementRow): Sourced<number> | null {
   if (reported && reported.value > 0) return reported;
 
   const equity = num(row, 'stockholdersEquity') ?? num(row, 'totalEquityGrossMinorityInterest');
-  const debt = num(row, 'totalDebt');
+  const debt = totalDebt(row)?.value ?? null;
   const cash =
     num(row, 'cashCashEquivalentsAndShortTermInvestments') ?? num(row, 'cashAndCashEquivalents');
   if (equity === null) return null;
@@ -233,7 +258,7 @@ function buildYear(
     depreciation,
     capex,
     changeInNwc: nwc,
-    totalDebt: firstOf(row, ['totalDebt']) ?? derivedValue(0, 'No total debt reported'),
+    totalDebt: totalDebt(row) ?? derivedValue(0, 'No total debt reported'),
     cash: firstOf(row, CASH_CHAIN) ?? derivedValue(0, 'No cash balance reported'),
     shares: firstOf(row, SHARES_CHAIN) ?? derivedValue(0, 'No share count reported'),
     interestExpense,
@@ -270,6 +295,29 @@ export function normalise(ticker: string, raw: RawTicker): Fundamentals {
       message:
         'Some line items were not reported and have been derived. Each one is labelled in the workings below.',
     });
+  }
+  // A zero that is really a missing field: no debt line at all in the latest
+  // year, while the company is paying interest or reported debt the year before.
+  // Carry the prior year's figure rather than hand the company free net cash.
+  const latestYear = years[0];
+  if (latestYear && latestYear.totalDebt.provenance.derived && latestYear.totalDebt.value === 0) {
+    const prior = years.find((y, i) => i > 0 && !(y.totalDebt.provenance.derived && y.totalDebt.value === 0));
+    const payingInterest = (latestYear.interestExpense?.value ?? 0) > 0;
+    if (prior && prior.totalDebt.value > 0) {
+      latestYear.totalDebt = derivedValue(
+        prior.totalDebt.value,
+        `No debt reported for the latest year; carried from ${prior.periodEnd}`
+      );
+    }
+    if (payingInterest || (prior && prior.totalDebt.value > 0)) {
+      flags.push({
+        code: 'DEBT_UNREPORTED',
+        severity: 'warn',
+        message: prior && prior.totalDebt.value > 0
+          ? `No debt figure was reported for the latest year, so the ${prior.periodEnd} figure is used. Override net debt if it has changed.`
+          : 'No debt figure was reported, but the company is paying interest, so net cash may be overstated.',
+      });
+    }
   }
   if (years.length < 4) {
     flags.push({

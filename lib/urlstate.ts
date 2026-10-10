@@ -52,7 +52,7 @@ export function decodeState(query: string): UrlState {
 
   const scenarioParam = p.get('scenario') as ScenarioName | null;
   const scenario = scenarioParam && SCENARIOS.includes(scenarioParam) ? scenarioParam : 'base';
-  const horizonYears = p.get('horizon') === '10' ? 10 : 5;
+  const horizonYears = p.get('horizon') === '5' ? 5 : 10;
 
   const overrides: Partial<Assumptions> = {};
   for (const [short, key] of Object.entries(SCALAR_KEYS)) {

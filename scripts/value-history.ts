@@ -27,7 +27,7 @@ async function main() {
   const tally: Record<string, number> = { valued: 0, declined: 0, dropped: 0, failed: 0 };
   for (const e of entries) {
     try {
-      const v = valueFundamentals(e.fundamentals, e.riskFree, 1, { scenario: 'base', horizonYears: 5 });
+      const v = valueFundamentals(e.fundamentals, e.riskFree, 1, { scenario: 'base', horizonYears: 10 });
       if (declinedByModel(v.flags)) {
         out[e.key] = { ratio: null, why: v.flags.filter((f) => f.severity === 'error').map((f) => f.code).join(',') };
         tally.declined++;

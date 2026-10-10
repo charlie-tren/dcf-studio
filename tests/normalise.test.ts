@@ -53,6 +53,27 @@ describe('normalise - fallback chains', () => {
     expect(f.flags.some((x) => x.code === 'MISSING_FIELD_DERIVED')).toBe(true);
   });
 
+  it('sums the debt components when totalDebt is missing', () => {
+    const raw = fixture('MSFT');
+    const latest = [...raw.statements].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    const reported = latest.totalDebt as number;
+    delete latest.totalDebt;
+    const f = normalise('MSFT', raw);
+    expect(f.years[0].totalDebt.value).toBe(reported);
+    expect(f.years[0].totalDebt.provenance.derived).toBe(true);
+    expect(f.flags.some((x) => x.code === 'DEBT_UNREPORTED')).toBe(false);
+  });
+
+  it('carries the prior year forward and flags it when no debt line exists at all', () => {
+    const raw = fixture('MSFT');
+    const sorted = [...raw.statements].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    for (const k of Object.keys(sorted[0])) if (/debt/i.test(k) && !/issuance|payments|repayment/i.test(k)) delete sorted[0][k];
+    const f = normalise('MSFT', raw);
+    expect(f.years[0].totalDebt.value).toBe(f.years[1].totalDebt.value);
+    expect(f.years[0].totalDebt.value).toBeGreaterThan(0);
+    expect(f.flags.some((x) => x.code === 'DEBT_UNREPORTED')).toBe(true);
+  });
+
   it('derives EBIT for a bank that reports neither EBIT nor operating income', () => {
     const f = normalise('CBA.AX', fixture('CBA.AX'));
     expect(f.years[0].ebit.provenance.derived).toBe(true);

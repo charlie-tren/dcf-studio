@@ -47,7 +47,9 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Risk-free rates are sourced live for the US (10-year Treasury) and Australia (RBA F2 table,
           the 10-year Australian Government series). Every other market uses a documented assumption,
-          labelled as such on the model page.
+          labelled as such on the model page. The equity risk premium is Damodaran&apos;s for January
+          2026: 4.23% implied by the S&amp;P 500, plus a country risk premium outside the Aaa-rated
+          markets.
         </p>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Two guards apply, because reported inputs are sometimes not what they claim to be. Beta is
@@ -106,9 +108,10 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <h2 className="pt-2 text-xl font-semibold text-white">Scenario presets</h2>
         <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>
-            <strong>Base</strong> - revenue CAGR, mean EBIT margin, mean capex and D&amp;A as a share
-            of revenue, and the median effective tax rate, all from the company&apos;s own reported
-            history.
+            <strong>Base</strong> - analyst revenue estimates for the first two years, then fading in a
+            straight line to terminal growth by the last year (from the historical growth rate where
+            there is no coverage). Mean EBIT margin, mean capex and D&amp;A as a share of revenue, and
+            the median effective tax rate, from the company&apos;s own reported history.
           </li>
           <li>
             <strong>Bull</strong> - Base plus 3pp of revenue growth, 2pp of EBIT margin and 0.5pp of
@@ -130,9 +133,8 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <p className="leading-relaxed text-[var(--text-dim)]">
           Each input is also solved in reverse: what would revenue growth, margin, or the discount
           rate have to be for today&apos;s price to hold, with the others left where the model has them.
-          Bisection against the same engine that produces the headline. Alphabet currently needs ~46%
-          annual revenue growth for five years against 12.5% of history, or a discount rate near 6% -
-          alternatives, not a set. Returns nothing where the price is unreachable in any input, rather
+          Bisection against the same engine that produces the headline. Each answer holds the other
+          inputs where they are, so they are alternatives, not a set. Returns nothing where the price is unreachable in any input, rather
           than extrapolating past the bracket.
         </p>
       </section>
@@ -163,8 +165,8 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
           </li>
           <li>
             <strong>History depth.</strong> Only four to five annual periods are available free, so
-            the historical anchors are short-run averages, and a five-year DCF anchored on trailing
-            history will read low against a company the market is pricing for acceleration.
+            margins and capex are short-run averages, and will read low against a company the market
+            is pricing for margin expansion.
           </li>
           <li>
             <strong>Currency.</strong> Some companies report in one currency and trade in another,

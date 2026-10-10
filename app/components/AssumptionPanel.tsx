@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react';
 import type { Assumptions, ScenarioName } from '@/lib/types';
 
 const SCENARIOS: { key: ScenarioName; label: string; hint: string }[] = [
-  { key: 'base', label: 'Base', hint: "The company's own reported history" },
+  { key: 'base', label: 'Base', hint: 'Analyst revenue for years 1-2, fading to terminal growth' },
   { key: 'bull', label: 'Bull', hint: '+3pp growth, +2pp margin, +0.5pp terminal growth' },
   { key: 'bear', label: 'Bear', hint: '-3pp growth, -2pp margin, -0.5pp terminal growth' },
   { key: 'consensus', label: 'Consensus', hint: 'Analyst revenue for years 1-2, then fades to history' },

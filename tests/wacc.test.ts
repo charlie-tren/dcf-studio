@@ -122,6 +122,8 @@ describe('buildWacc', () => {
     const w = buildWacc({ ...BASE, interestExpense: null });
     expect(w.costOfDebt).toBeCloseTo(0.042 + 0.02, 10);
     expect(w.costOfDebtSource).toMatch(/assum/i);
+    // A 2% spread is 200bp. The label printed "2bp" from percent x 100.
+    expect(w.costOfDebtSource).toMatch(/\+ 200bp/);
   });
 
   it('rejects an implausibly wide implied cost of debt', () => {

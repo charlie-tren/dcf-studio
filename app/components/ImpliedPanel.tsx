@@ -17,7 +17,12 @@ export function ImpliedPanel({
   const rows = [
     {
       label: 'Revenue growth, every year',
-      modelled: assumptions.revenueGrowth[0],
+      // The solve is one flat rate for every year, so compare it with the
+      // path's average, not its first year: the base path fades to terminal growth.
+      modelled:
+        assumptions.revenueGrowth.reduce((acc, g) => acc * (1 + g), 1) **
+          (1 / assumptions.revenueGrowth.length) -
+        1,
       solved: implied.revenueGrowth,
     },
     { label: 'EBIT margin', modelled: assumptions.ebitMargin[0], solved: implied.ebitMargin },

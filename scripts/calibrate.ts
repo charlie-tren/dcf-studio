@@ -69,7 +69,7 @@ export async function calibrate(sample: string[] = SAMPLE): Promise<{
   const rows: Row[] = [];
   for (const ticker of sample) {
     try {
-      const v = await buildValuation(ticker, { scenario: 'base', horizonYears: (Number(process.env.HZ ?? 5) as 5 | 10) });
+      const v = await buildValuation(ticker, { scenario: 'base', horizonYears: (Number(process.env.HZ ?? 10) as 5 | 10) });
       const ratio = v.fundamentals.price > 0 ? v.valuePerShareQuoted / v.fundamentals.price : null;
       rows.push({
         ticker,

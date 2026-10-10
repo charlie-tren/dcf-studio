@@ -2,19 +2,25 @@
 
 ## Open items - Tier 0 (Auto + unblocked) first, then by Score descending
 
-Last refresh: 2026-10-10 - converted to the ranked table; added #1, #6 and #7 from a
-calibration run over the 44-name sample (published median 0.54x of price on 428 names).
+Last refresh: 2026-10-10 - growth path, risk premium, debt fallback and JSE/TASE fixtures
+shipped; margin path removed on the measurement; working-capital row added.
 
 | ID | Item | Score | Owner | Build | Prerequisites | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Base growth path: consensus years 1-2, fading to terminal g | 4.0 | Auto | 1 day | None | Base holds the 4-year trailing CAGR flat for every year, so post-COVID and post-2022 normalisation runs for five years: DHR -2.7%, TXN -4.1%, SHEL -11.2%, NVDA +50%. At 10 years the same flat rate compounds (NVDA 2.8x). The existing consensus scenario alone took median 0.59 -> 0.62x, implausible 3 -> 1, usable 22 -> 25 of 44. Fade to terminal g over years 6-10 rather than a cliff after year 5. |
-| 2 | Dividend-discount model for financials | 3.4 | Auto | 2 days | None | 136 of 614 names are declined as the wrong tool, banks among them. Detect financial sector and switch to DDM or excess returns. Charlie's call 30/07/2026. |
-| 3 | Debt field that cannot tell zero from missing | 3.2 | Auto | 1-2 hr | None | NPN.JO flips between 0 and 18.0bn totalDebt across pulls, moving value +15.08 to -7.87. A zero debt alongside positive interest expense should read as missing, not net cash. |
-| 4 | JSE and TASE fixtures | 2.8 | Auto | <1 hr | None | Record NPN.JO and TEVA.TA so the ZAc and ILA conversions are covered end to end, as SHEL.L is for pence. |
-| 5 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. Ask first whether 11 years improves a 5-year model. |
-| 6 | Equity risk premium from Damodaran's implied figure, sourced and dated | 4.0 | Mixed | 2-4 hr | Charlie's yes | Implied discount rates that clear the price run 4-7% on the low names against model WACCs of 9-12% (AAPL 10.9 vs 4.6, MSFT 11.0 vs 7.6), so the bias is mostly the discount rate, not the cashflows. -120bp across markets: median 0.59 -> 0.69x, usable 22 -> 26. Also closes the 03/10 review's unsourced-ERP point. Same item as hub-notes P2 "Decide whether DCF Studio's equity risk premium is too high". |
-| 7 | Margin path from latest year, fading to the historical mean | 3.2 | Auto | half day | needs the growth-path row shipped | Margin is the flat 4-year mean, so a business whose margin has moved is valued on its past: AMZN at 7.7%. Unmeasured; re-run calibrate.ts before and after. |
-| 8 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
+| 1 | Dividend-discount or excess-returns model for financials | 3.4 | Auto | 2 days | None | 114 of 614 names are declined as the wrong tool, mostly banks and insurers. Needs its own page path (the forecast table, chart and workbook are FCFF-shaped) and its own calibration. Charlie's call 30/07/2026. |
+| 2 | Working-capital release over a ten-year horizon | 2.8 | Auto | half day | None | Negative-working-capital companies are credited a growing cash inflow every forecast year: Apple +29bn a year, about a fifth of FCFF, now for ten years rather than five. Unmeasured across the population; run calibrate.ts with the NWC ratio floored at zero to size it. |
+| 3 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
+| 4 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
+
+## Shipped
+- ~~Base growth path: consensus years 1-2, fading to terminal growth, ten-year default~~ - 2026-10-10. Universe median 0.54x -> 0.67x, inside 0.5-2.0x 49% -> 60%, published 428 -> 451 (with the row below).
+- ~~Equity risk premium from Damodaran, January 2026~~ - 2026-10-10. 4.23% mature plus country premium.
+- ~~Debt that cannot tell zero from missing~~ - 2026-10-10. Components, then prior year carried, then a DEBT_UNREPORTED flag.
+- ~~JSE and TASE fixtures~~ - 2026-10-10. NPN.JO and TEVA.TA end to end.
+- ~~Cost-of-debt label read "2bp" for a 200bp spread~~ - 2026-10-10, found on the AAPL page.
+
+## Removed
+- ~~Margin path from the latest year, fading to the mean~~ - measured 10/10/2026 on the 44-name sample: median 0.783 -> 0.780 fading, 0.765 holding the latest, usable 26 either way. No population gain.
 
 ## Item details
 

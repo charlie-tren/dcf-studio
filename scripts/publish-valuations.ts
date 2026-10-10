@@ -89,7 +89,7 @@ async function main() {
 
   const results = await pool(tickers, CONCURRENCY, async (ticker): Promise<Row | null> => {
     try {
-      const v = await buildValuation(ticker, { scenario: 'base', horizonYears: 5 });
+      const v = await buildValuation(ticker, { scenario: 'base', horizonYears: 10 });
       // Before the ratio: a result the page calls the wrong tool is not a valuation
       // whatever its number looks like, and a bank's usually looks generous.
       if (declinedByModel(v.flags)) {
@@ -146,7 +146,7 @@ async function main() {
         // What the number IS, stated in the file, because a bare ratio invites the
         // reader to treat it as a price.
         measure:
-          'implied value per share divided by market price, base case, 5-year forecast',
+          'implied value per share divided by market price, base case, 10-year forecast',
         note:
           'An ORDERING, not a fair value. This model on defaults runs systematically '
           + 'below market prices, so rank these rather than printing them.',

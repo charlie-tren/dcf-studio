@@ -16,11 +16,16 @@ import { fetchTicker } from '../lib/yahoo';
 // actually spent. It is the only recorded ticker where depreciation and D&A
 // differ by an order of magnitude, so it is the only one that can catch a
 // regression here.
-const TICKERS = ['MSFT', 'BHP.AX', 'ARB.AX', 'CBA.AX', 'SGP.AX', 'MSB.AX', 'SHEL.L', 'RY.TO', 'AMD'];
+//
+// NPN.JO and TEVA.TA joined on 10/10/2026: the other two sub-unit quotes (ZAc,
+// ILA), so the conversion is exercised end to end as SHEL.L does for pence.
+const TICKERS = ['MSFT', 'BHP.AX', 'ARB.AX', 'CBA.AX', 'SGP.AX', 'MSB.AX', 'SHEL.L', 'RY.TO', 'AMD', 'NPN.JO', 'TEVA.TA'];
 
+// Name tickers on the command line to record just those, leaving the rest alone.
 async function main() {
   mkdirSync('tests/fixtures', { recursive: true });
-  for (const ticker of TICKERS) {
+  const only = process.argv.slice(2);
+  for (const ticker of only.length > 0 ? only : TICKERS) {
     const raw = await fetchTicker(ticker);
     const file = `tests/fixtures/${ticker.replace('.', '_')}.json`;
     writeFileSync(file, JSON.stringify(raw, null, 2));

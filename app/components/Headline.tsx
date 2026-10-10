@@ -8,7 +8,7 @@ export function Headline({ v }: { v: Valuation }) {
   /**
    * Where terminal growth is at or above the WACC the perpetuity cannot
    * converge, so the engine returns a terminal value of nil. What is left is
-   * the present value of five years' cashflow less net debt, which is a real
+   * the present value of the explicit years' cashflow less net debt, which is a real
    * quantity but not a valuation - Toyota's read "3,027.73 per share, -198.62%"
    * in bold while the model was refusing to answer. TerminalComparison already
    * shows the refusal in place of its number; these two never got the memo.

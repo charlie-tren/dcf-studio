@@ -207,6 +207,39 @@ function consensusGrowthPath(
   return { path, note: null };
 }
 
+/**
+ * The base growth path: analyst revenue for the years it covers (two, from Yahoo),
+ * then a straight line from the last rate to terminal growth by the final year.
+ * With no coverage it starts from the historical rate instead.
+ *
+ * It replaced the trailing CAGR held flat for every year, which carried whatever
+ * happened in the last four years forward as the forecast: Danaher's post-COVID
+ * run-off at -2.7% a year, Shell's 2022 price spike unwinding at -11.2%, Nvidia at
+ * +50% (the clamp) - and over ten years that compounds, which put Nvidia at 2.8x
+ * its price. Fading to terminal growth also removes the cliff between the last
+ * explicit year and the perpetuity.
+ *
+ * Measured over calibrate.ts's 44 names, 10/10/2026, against flat-CAGR at five
+ * years: median value/price 0.59x -> 0.67x, usable (0.5-2.0x) 22 -> 28,
+ * implausible 3 -> 1. The SAME fade over five years was worse than flat (0.52x,
+ * 5 implausible): five years is too short to fade a compounder honestly, which is
+ * why the default horizon is ten.
+ */
+function baseGrowthPath(
+  f: Fundamentals,
+  d: HistoricalDrivers,
+  horizon: number,
+  terminalGrowth: number
+): number[] {
+  const consensus = f.analystRevenue.length > 0 ? consensusGrowthPath(f, d, horizon).path : [];
+  const covered = Math.min(f.analystRevenue.length, horizon - 1);
+  const first = consensus.slice(0, covered);
+  const from = covered > 0 ? first[covered - 1] : d.revenueCagr;
+  const rest = horizon - covered;
+  const fade = Array.from({ length: rest }, (_, i) => from + (terminalGrowth - from) * ((i + 1) / rest));
+  return [...first, ...fade];
+}
+
 export type ScenarioResult = {
   assumptions: Assumptions;
   drivers: HistoricalDrivers;
@@ -303,7 +336,7 @@ export function buildScenario(
     if (note) notes.push(note);
   } else {
     const tilt = scenario === 'base' ? 0 : TILTS[scenario].revenueGrowth;
-    growthPath = Array(horizonYears).fill(drivers.revenueCagr + tilt);
+    growthPath = baseGrowthPath(f, drivers, horizonYears, DEFAULT_TERMINAL_GROWTH).map((g) => g + tilt);
     if (scenario !== 'base') {
       marginTilt = TILTS[scenario].ebitMargin;
       terminalTilt = TILTS[scenario].terminalGrowth;

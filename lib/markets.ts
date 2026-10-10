@@ -38,6 +38,19 @@ export const QUOTE_SUBUNIT_DIVISOR: Record<string, number> = Object.fromEntries(
   Object.entries(QUOTE_SUBUNIT).map(([code, { divisor }]) => [code, divisor])
 );
 
+/**
+ * Equity risk premiums are Damodaran's "Country Default Spreads and Risk Premiums",
+ * January 2026: the mature-market premium implied by the S&P 500 at 1 January
+ * (4.23%) plus each country's risk premium. The same release as the cost-of-debt
+ * spreads in lib/wacc.ts.
+ *
+ * They were hand-set at 5.5-8% with no source, which with a 4%+ risk-free rate
+ * put Apple's cost of capital at 10.9% where the price implies 4.6%. -120bp across
+ * the board took the 44-name median value/price from 0.59x to 0.69x. Using the
+ * premium the index itself implies means a low reading says a company is dear
+ * against what the market requires of equities generally, not that equities are
+ * dear: that second view is a market call, and this is a single-stock tool.
+ */
 const US: Market = {
   suffix: '',
   name: 'United States',
@@ -45,23 +58,23 @@ const US: Market = {
   tier: 1,
   riskFreeSource: 'yahoo-tnx',
   defaultRiskFreeRate: 0.042,
-  equityRiskPremium: 0.055,
+  equityRiskPremium: 0.0423,
   statutoryTaxRate: 0.21,
 };
 
 const MARKETS: Market[] = [
   US,
-  { suffix: 'AX', name: 'ASX', currency: 'AUD', tier: 1, riskFreeSource: 'rba', defaultRiskFreeRate: 0.042, equityRiskPremium: 0.06, statutoryTaxRate: 0.30 },
-  { suffix: 'NZ', name: 'NZX', currency: 'NZD', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.045, equityRiskPremium: 0.065, statutoryTaxRate: 0.28 },
-  { suffix: 'L', name: 'London', currency: 'GBP', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.045, equityRiskPremium: 0.055, statutoryTaxRate: 0.25 },
-  { suffix: 'DE', name: 'Xetra', currency: 'EUR', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.026, equityRiskPremium: 0.06, statutoryTaxRate: 0.30 },
-  { suffix: 'PA', name: 'Euronext Paris', currency: 'EUR', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.032, equityRiskPremium: 0.06, statutoryTaxRate: 0.258 },
-  { suffix: 'SW', name: 'SIX Swiss', currency: 'CHF', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.005, equityRiskPremium: 0.055, statutoryTaxRate: 0.15 },
-  { suffix: 'HK', name: 'HKEX', currency: 'HKD', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.032, equityRiskPremium: 0.07, statutoryTaxRate: 0.165 },
-  { suffix: 'T', name: 'Tokyo', currency: 'JPY', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.017, equityRiskPremium: 0.06, statutoryTaxRate: 0.305 },
-  { suffix: 'TO', name: 'Toronto', currency: 'CAD', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.033, equityRiskPremium: 0.055, statutoryTaxRate: 0.265 },
-  { suffix: 'NS', name: 'India NSE', currency: 'INR', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.068, equityRiskPremium: 0.08, statutoryTaxRate: 0.252 },
-  { suffix: 'KS', name: 'Korea', currency: 'KRW', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.030, equityRiskPremium: 0.07, statutoryTaxRate: 0.242 },
+  { suffix: 'AX', name: 'ASX', currency: 'AUD', tier: 1, riskFreeSource: 'rba', defaultRiskFreeRate: 0.042, equityRiskPremium: 0.0423, statutoryTaxRate: 0.30 },
+  { suffix: 'NZ', name: 'NZX', currency: 'NZD', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.045, equityRiskPremium: 0.0423, statutoryTaxRate: 0.28 },
+  { suffix: 'L', name: 'London', currency: 'GBP', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.045, equityRiskPremium: 0.0501, statutoryTaxRate: 0.25 },
+  { suffix: 'DE', name: 'Xetra', currency: 'EUR', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.026, equityRiskPremium: 0.0423, statutoryTaxRate: 0.30 },
+  { suffix: 'PA', name: 'Euronext Paris', currency: 'EUR', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.032, equityRiskPremium: 0.0501, statutoryTaxRate: 0.258 },
+  { suffix: 'SW', name: 'SIX Swiss', currency: 'CHF', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.005, equityRiskPremium: 0.0423, statutoryTaxRate: 0.15 },
+  { suffix: 'HK', name: 'HKEX', currency: 'HKD', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.032, equityRiskPremium: 0.0501, statutoryTaxRate: 0.165 },
+  { suffix: 'T', name: 'Tokyo', currency: 'JPY', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.017, equityRiskPremium: 0.0514, statutoryTaxRate: 0.305 },
+  { suffix: 'TO', name: 'Toronto', currency: 'CAD', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.033, equityRiskPremium: 0.0423, statutoryTaxRate: 0.265 },
+  { suffix: 'NS', name: 'India NSE', currency: 'INR', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.068, equityRiskPremium: 0.0708, statutoryTaxRate: 0.252 },
+  { suffix: 'KS', name: 'Korea', currency: 'KRW', tier: 2, riskFreeSource: 'default', defaultRiskFreeRate: 0.030, equityRiskPremium: 0.0487, statutoryTaxRate: 0.242 },
 ];
 
 const UNKNOWN: Market = {

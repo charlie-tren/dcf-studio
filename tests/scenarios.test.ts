@@ -68,13 +68,42 @@ describe('buildScenario - tilts', () => {
 });
 
 describe('buildScenario - consensus', () => {
-  it('uses consensus revenue for the first two years then fades to the base rate', () => {
+  it('uses consensus revenue for the first two years then fades to the historical rate', () => {
     const f = fundamentals('MSFT');
-    const base = buildScenario(f, 'base', 5, 0.09).assumptions;
     const c = buildScenario(f, 'consensus', 5, 0.09).assumptions;
-    expect(c.revenueGrowth[0]).not.toBeCloseTo(base.revenueGrowth[0], 6);
+    const d = historicalDrivers(f);
     // The final year has faded all the way back to the historical rate.
-    expect(c.revenueGrowth[4]).toBeCloseTo(base.revenueGrowth[4], 6);
+    expect(c.revenueGrowth[4]).toBeCloseTo(d.revenueCagr, 6);
+  });
+});
+
+describe('buildScenario - base growth path', () => {
+  it('shares the consensus years, then fades to terminal growth by the final year', () => {
+    const f = fundamentals('MSFT');
+    const base = buildScenario(f, 'base', 10, 0.09).assumptions;
+    const c = buildScenario(f, 'consensus', 10, 0.09).assumptions;
+    expect(base.revenueGrowth).toHaveLength(10);
+    expect(base.revenueGrowth[0]).toBeCloseTo(c.revenueGrowth[0], 10);
+    expect(base.revenueGrowth[1]).toBeCloseTo(c.revenueGrowth[1], 10);
+    expect(base.revenueGrowth[9]).toBeCloseTo(base.terminalGrowth, 10);
+    // A straight line between the last consensus year and terminal growth.
+    const steps = base.revenueGrowth.slice(2).map((g, i, a) => (i === 0 ? null : g - a[i - 1])).slice(1);
+    for (const s of steps) expect(s).toBeCloseTo(steps[0] as number, 10);
+  });
+
+  it('starts from the historical rate where there is no analyst coverage', () => {
+    const f = { ...fundamentals('MSFT'), analystRevenue: [] };
+    const base = buildScenario(f, 'base', 10, 0.09).assumptions;
+    const d = historicalDrivers(f);
+    const step = (base.terminalGrowth - d.revenueCagr) / 10;
+    expect(base.revenueGrowth[0]).toBeCloseTo(d.revenueCagr + step, 10);
+    expect(base.revenueGrowth[9]).toBeCloseTo(base.terminalGrowth, 10);
+  });
+
+  it('never holds a trailing rate flat: no two years equal unless it already sits at terminal growth', () => {
+    const f = { ...fundamentals('MSFT'), analystRevenue: [] };
+    const g = buildScenario(f, 'base', 10, 0.09).assumptions.revenueGrowth;
+    expect(new Set(g.map((x) => x.toFixed(10))).size).toBe(10);
   });
 
   it('keeps margins and capex rule-based, since no consensus exists for them', () => {

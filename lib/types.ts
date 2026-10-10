@@ -24,7 +24,8 @@ export type DataQualityCode =
   | 'SHORT_HISTORY'
   | 'TERMINAL_GROWTH_BLOCKED'
   | 'STALE_DATA'
-  | 'NOT_ORDINARY_EQUITY';
+  | 'NOT_ORDINARY_EQUITY'
+  | 'DEBT_UNREPORTED';
 
 export type DataQualityFlag = {
   code: DataQualityCode;

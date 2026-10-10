@@ -53,6 +53,22 @@ describe('buildValuation', () => {
     expect(v.valuePerShareQuoted).toBeCloseTo(v.dcf.gordon.valuePerShare * 0.79 * 100, 4);
   });
 
+  it.each([
+    // Naspers reports USD and quotes ZAc; Teva reports USD and quotes ILA (agorot).
+    ['NPN.JO', 17.5, 'ZAc'],
+    ['TEVA.TA', 3.7, 'ILA'],
+  ])('handles %s, a sub-unit quote in the other two markets that use one', async (t, fx, unit) => {
+    const v = await buildValuation(t, { scenario: 'base', horizonYears: 10 }, deps(t, fx));
+    expect(v.fundamentals.quoteCurrency).toBe(unit);
+    expect(v.valuePerShareQuoted).toBeCloseTo(v.dcf.gordon.valuePerShare * fx * 100, 4);
+    // Absolute: Naspers values negative, because a holding company's worth is its
+    // Tencent stake and free cashflow cannot see it. The check is for a 100x unit
+    // error, which shows in the magnitude whatever the sign.
+    const ratio = Math.abs(v.valuePerShareQuoted / v.fundamentals.price);
+    expect(ratio).toBeGreaterThan(0.05);
+    expect(ratio).toBeLessThan(20);
+  });
+
   it('still returns a model for a bank, carrying the sector warning', async () => {
     const v = await buildValuation('CBA.AX', { scenario: 'base', horizonYears: 5 }, deps('CBA.AX'));
     expect(v.flags.some((x) => x.code === 'FINANCIAL_SECTOR')).toBe(true);

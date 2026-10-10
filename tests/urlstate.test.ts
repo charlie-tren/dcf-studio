@@ -46,14 +46,14 @@ describe('url state', () => {
   it('returns a sane default for an empty query string', () => {
     const d = decodeState('');
     expect(d.scenario).toBe('base');
-    expect(d.horizonYears).toBe(5);
+    expect(d.horizonYears).toBe(10);
     expect(d.overrides).toEqual({});
   });
 
   it('ignores unknown or malformed parameters rather than throwing', () => {
     const d = decodeState('scenario=nonsense&horizon=99&wacc=abc&junk=1');
     expect(d.scenario).toBe('base');
-    expect(d.horizonYears).toBe(5);
+    expect(d.horizonYears).toBe(10);
     expect(d.overrides.wacc).toBeUndefined();
   });
 

@@ -8,7 +8,7 @@ export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string 
       value: pct(w.riskFreeRate, 2),
       note: w.riskFreeAssumed ? `${w.riskFreeSource} (assumption)` : w.riskFreeSource,
     },
-    { label: 'Equity risk premium', value: pct(w.equityRiskPremium, 2), note: 'Market assumption' },
+    { label: 'Equity risk premium', value: pct(w.equityRiskPremium, 2), note: 'Damodaran, January 2026' },
     {
       label: 'Beta',
       value: w.beta.toFixed(3),
