@@ -98,13 +98,15 @@ shipped.
   conservative way. Floored in the engine AND in the sheet formula - the cached result
   alone would have looked right while Excel recalculated the floor away on open.
 
-- [ ] **No fixture covers a JSE or TASE name.** The sub-unit conversion for ZAc and ILA is
+- [x] **No fixture covers a JSE or TASE name.** DONE 10/10/2026: NPN.JO and TEVA.TA
+  recorded and valued end to end. The sub-unit conversion for ZAc and ILA is
   now covered by unit tests on `quoteConversionFactor`, which is the right level for the
   arithmetic, but nothing exercises the full chain end to end the way `SHEL.L` does for
   pence. Worth recording NPN.JO and TEVA.TA the next time `record-fixtures.ts` runs.
   Noted 27/08/2026.
 
-- [ ] **Yahoo's `totalDebt` is intermittent on NPN.JO.** A cached payload had it at 0 with
+- [x] **Yahoo's `totalDebt` is intermittent on NPN.JO.** DONE 10/10/2026: debt falls back
+  to its components, then the prior year, then a DEBT_UNREPORTED flag. A cached payload had it at 0 with
   a "No total debt reported" derived value, while a fresh pull gave 18.0bn - which flips
   the name between net cash and net debt and moved the valuation from +15.08 to -7.87 per
   share. The model has no way to tell a real zero from a missing field. Noted 27/08/2026
@@ -146,7 +148,8 @@ shipped.
 
 ## Post-v1
 
-- [ ] **Dividend-discount model for financials.** Banks and insurers have no meaningful
+- [x] **Dividend-discount model for financials.** DONE 11/10/2026 as an excess-returns
+  model (lib/excessReturns.ts), with its own workbook. Banks and insurers have no meaningful
   EBIT, capex or working capital, so FCFF misprices them. v1 warns loudly and runs
   anyway; the correct fix is to detect the financial sector and switch to a DDM or
   excess-returns model. Probe evidence: CBA.AX and RY.TO both return no operating
