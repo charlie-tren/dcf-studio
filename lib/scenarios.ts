@@ -71,6 +71,9 @@ function currentEvEbitda(f: Fundamentals): { multiple: number; raw: number; clam
  */
 const CAPEX_TO_DA_FLOOR = 0.5;
 const CAPEX_TO_REVENUE_FLOOR = 0.01;
+/** Trade working capital is rarely outside this as a share of revenue (Thermo 24%). */
+const NWC_LEVEL_BAND = 0.3;
+const NWC_LEVEL_CEILING = 0.5;
 /** A five-year CAGR beyond this is a data artefact or a one-off, not a forecast. */
 const GROWTH_CLAMP = 0.5;
 
@@ -137,6 +140,21 @@ export function historicalDrivers(f: Fundamentals): HistoricalDrivers {
     if (Math.abs(deltaRevenue) > 0) nwcRatios.push(years[i].changeInNwc.value / deltaRevenue);
   }
 
+  // Trade working capital as a share of revenue, held constant: each dollar of new
+  // revenue then carries that share in receivables and stock, net of payables.
+  // Preferred over the cashflow line's year-on-year movement, which was the only
+  // measure until 10/10/2026: the median of three or four ratios of a noisy flow to
+  // a small revenue change. Visa, Coca-Cola, Thermo Fisher and Starbucks all sat on
+  // the +1.0 clamp - a dollar of working capital per dollar of growth - because
+  // Yahoo's line carries settlement flows and, for Coca-Cola, a 6bn tax deposit.
+  // Apple drew a 29bn-a-year release from one year in which revenue fell. The level
+  // is stable year to year (Visa 5.7-6.4%, Apple -5.9 to -7.9%). Population effect
+  // on the 44-name sample was neutral (median 0.783x -> 0.770x), because the
+  // perpetuity carries no working capital; the fix is to the forecast rows.
+  const levels = years
+    .filter((y) => y.tradeWorkingCapital !== null && y.revenue.value > 0)
+    .map((y) => (y.tradeWorkingCapital as { value: number }).value / y.revenue.value);
+
   const taxRates = years
     .filter((y) => y.pretaxIncome.value > 0 && y.taxProvision.value >= 0)
     .map((y) => y.taxProvision.value / y.pretaxIncome.value);
@@ -162,7 +180,12 @@ export function historicalDrivers(f: Fundamentals): HistoricalDrivers {
     ...depreciationShare(f, years, ratios),
     capexPctRevenue: mean(ratios((y) => y.capex.value)),
     // A ratio against a near-zero revenue change explodes; keep it in a sane band.
-    nwcPctRevenueChange: nwcRatios.length > 0 ? clamp(median(nwcRatios), -1, 1) : 0,
+    nwcPctRevenueChange:
+      levels.length > 0
+        ? clamp(median(levels), -NWC_LEVEL_BAND, NWC_LEVEL_CEILING)
+        : nwcRatios.length > 0
+          ? clamp(median(nwcRatios), -1, 1)
+          : 0,
     taxRate: clamp(effectiveTax, 0, statutory),
     latestRevenue: latest.revenue.value,
   };

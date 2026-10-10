@@ -35,7 +35,9 @@ FCFF(t)    = NOPAT(t) + D&A(t) - Capex(t) - change in NWC(t)`}</pre>
         <p className="leading-relaxed text-[var(--text-dim)]">
           An increase in net working capital is a cash outflow and is subtracted. Yahoo reports the
           working-capital movement with the opposite sign, as a cashflow contribution, so it is
-          flipped once during normalisation.
+          flipped once during normalisation. In the forecast, trade working capital (receivables plus
+          inventory less payables) is held at its median share of revenue, so each dollar of new
+          revenue carries that share.
         </p>
       </section>
 

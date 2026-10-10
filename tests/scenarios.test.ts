@@ -32,6 +32,26 @@ describe('historicalDrivers', () => {
     expect(d.latestRevenue).toBeCloseTo(f.years[0].revenue.value, 2);
   });
 
+  it('sets working capital from the trade balance as a share of revenue', () => {
+    const f = fundamentals('MSFT');
+    const levels = f.years
+      .filter((y) => y.tradeWorkingCapital !== null)
+      .map((y) => (y.tradeWorkingCapital as { value: number }).value / y.revenue.value)
+      .sort((a, b) => a - b);
+    expect(levels.length).toBeGreaterThan(2);
+    const mid = Math.floor(levels.length / 2);
+    const median = levels.length % 2 ? levels[mid] : (levels[mid - 1] + levels[mid]) / 2;
+    expect(historicalDrivers(f).nwcPctRevenueChange).toBeCloseTo(median, 10);
+  });
+
+  it('falls back to the cashflow movement where the balance sheet has no trade lines', () => {
+    const f = fundamentals('MSFT');
+    const bare = { ...f, years: f.years.map((y) => ({ ...y, tradeWorkingCapital: null })) };
+    const d = historicalDrivers(bare);
+    expect(d.nwcPctRevenueChange).not.toBeCloseTo(historicalDrivers(f).nwcPctRevenueChange, 6);
+    expect(Math.abs(d.nwcPctRevenueChange)).toBeLessThanOrEqual(1);
+  });
+
   it('produces a sane growth rate rather than a wild one for a loss-maker', () => {
     const d = historicalDrivers(fundamentals('MSB.AX'));
     expect(Number.isFinite(d.revenueCagr)).toBe(true);

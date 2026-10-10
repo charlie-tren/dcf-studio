@@ -8,15 +8,15 @@ shipped; margin path removed on the measurement; working-capital row added.
 | ID | Item | Score | Owner | Build | Prerequisites | Notes |
 |---|---|---|---|---|---|---|
 | 1 | Dividend-discount or excess-returns model for financials | 3.4 | Auto | 2 days | None | 114 of 614 names are declined as the wrong tool, mostly banks and insurers. Needs its own page path (the forecast table, chart and workbook are FCFF-shaped) and its own calibration. Charlie's call 30/07/2026. |
-| 2 | Working-capital release over a ten-year horizon | 2.8 | Auto | half day | None | Negative-working-capital companies are credited a growing cash inflow every forecast year: Apple +29bn a year, about a fifth of FCFF, now for ten years rather than five. Unmeasured across the population; run calibrate.ts with the NWC ratio floored at zero to size it. |
-| 3 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
-| 4 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
+| 2 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
+| 3 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
 
 ## Shipped
 - ~~Base growth path: consensus years 1-2, fading to terminal growth, ten-year default~~ - 2026-10-10. Universe median 0.54x -> 0.67x, inside 0.5-2.0x 49% -> 60%, published 428 -> 451 (with the row below).
 - ~~Equity risk premium from Damodaran, January 2026~~ - 2026-10-10. 4.23% mature plus country premium.
 - ~~Debt that cannot tell zero from missing~~ - 2026-10-10. Components, then prior year carried, then a DEBT_UNREPORTED flag.
 - ~~JSE and TASE fixtures~~ - 2026-10-10. NPN.JO and TEVA.TA end to end.
+- ~~Working capital from the trade balance, not the cashflow line~~ - 2026-10-10. Visa, Coca-Cola, Thermo, Starbucks were on the +1.0 clamp; Apple drew a 29bn release from one down year. Population-neutral (0.783x -> 0.770x); the fix is to the forecast rows.
 - ~~Cost-of-debt label read "2bp" for a 200bp spread~~ - 2026-10-10, found on the AAPL page.
 
 ## Removed

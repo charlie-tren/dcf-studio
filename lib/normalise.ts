@@ -114,6 +114,21 @@ function changeInNwc(
 }
 
 /**
+ * Trade working capital as a balance-sheet level: receivables plus inventory less
+ * payables. Inventory may be absent (a software or services business holds none);
+ * receivables and payables may not.
+ */
+function tradeWorkingCapital(row: RawStatementRow): Sourced<number> | null {
+  const receivables = num(row, 'accountsReceivable');
+  const payables = num(row, 'accountsPayable');
+  if (receivables === null || payables === null) return null;
+  return derivedValue(
+    receivables + (num(row, 'inventory') ?? 0) - payables,
+    'Receivables + inventory - payables'
+  );
+}
+
+/**
  * Total debt, falling back to its components before concluding there is none.
  *
  * Yahoo's totalDebt is intermittent on some names: Naspers came back at 0 in one
@@ -263,6 +278,7 @@ function buildYear(
     shares: firstOf(row, SHARES_CHAIN) ?? derivedValue(0, 'No share count reported'),
     interestExpense,
     investedCapital: investedCapital(row),
+    tradeWorkingCapital: tradeWorkingCapital(row),
   };
 }
 
