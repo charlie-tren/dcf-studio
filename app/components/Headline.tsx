@@ -13,7 +13,7 @@ export function Headline({ v }: { v: Valuation }) {
    * in bold while the model was refusing to answer. TerminalComparison already
    * shows the refusal in place of its number; these two never got the memo.
    */
-  const blocked = v.dcf.gordon.terminal.blocked;
+  const blocked = !v.excessReturns && v.dcf.gordon.terminal.blocked;
 
   return (
     <header>
@@ -67,8 +67,14 @@ export function Headline({ v }: { v: Valuation }) {
       </div>
 
       <p className="mt-5 text-sm text-[var(--text-dim)]">
-        {v.assumptions.horizonYears}-year forecast · Perpetuity growth terminal value ·{' '}
-        {v.assumptions.midYearConvention ? 'Mid-year' : 'Year-end'} discounting ·{' '}
+        {v.excessReturns ? (
+          <>{v.assumptions.horizonYears}-year forecast · Excess returns over book equity ·{' '}</>
+        ) : (
+          <>
+            {v.assumptions.horizonYears}-year forecast · Perpetuity growth terminal value ·{' '}
+            {v.assumptions.midYearConvention ? 'Mid-year' : 'Year-end'} discounting ·{' '}
+          </>
+        )}
         <span className="text-[var(--text-faint)]">
           {v.scenario.charAt(0).toUpperCase() + v.scenario.slice(1)} case
           {v.modified ? ', edited' : ''}

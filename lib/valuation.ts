@@ -1,5 +1,6 @@
 import { impliedExpectations, type ImpliedExpectations } from './backsolve';
 import { runDcf } from './dcf';
+import { excessReturns, type ExcessReturns } from './excessReturns';
 import { majorCurrency, priceInReportingCurrency, toQuoteDisplayUnits } from './fx';
 import { marketFor } from './markets';
 import { normalise } from './normalise';
@@ -51,6 +52,12 @@ export type Valuation = {
   assumptions: Assumptions;
   wacc: WaccBreakdown;
   dcf: DcfResult;
+  /**
+   * Set for banks and insurers, and then it IS the valuation: the headline, the
+   * upside and the published ratio come from it, and the free-cashflow workings
+   * are computed but not presented.
+   */
+  excessReturns: ExcessReturns | null;
   sensitivity: SensitivityGrid;
   /** What each input would have to be for today's price to be right. */
   implied: ImpliedExpectations;
@@ -190,7 +197,14 @@ export function valueFundamentals(
     quoteCurrency: fundamentals.quoteCurrency,
     fxRate,
   };
-  const { value: valuePerShareQuoted } = toQuoteDisplayUnits(dcf.gordon.valuePerShare, fxContext);
+  const isFinancial = fundamentals.flags.some((f) => f.code === 'FINANCIAL_SECTOR');
+  const er = isFinancial
+    ? excessReturns(fundamentals, wacc.costOfEquity, assumptions.horizonYears, assumptions.terminalGrowth)
+    : null;
+  const { value: valuePerShareQuoted } = toQuoteDisplayUnits(
+    er ? er.valuePerShare : dcf.gordon.valuePerShare,
+    fxContext
+  );
 
   // Backsolve against the price in REPORTING currency, because that is the space
   // the engine works in. Comparing a quoted pence price to a dollar model would
@@ -201,7 +215,19 @@ export function valueFundamentals(
     priceInReportingCurrency(fundamentals.price, fxContext)
   );
 
-  const flags: DataQualityFlag[] = [...fundamentals.flags, ...scenario.flags];
+  // With an excess-returns value the sector flag stops being a refusal: the model
+  // that is wrong for a bank is no longer the one producing the number.
+  const flags: DataQualityFlag[] = [
+    // Derived line items are cashflow-statement lines the bank page does not show.
+    ...fundamentals.flags
+      .filter((f) => !(er && f.code === 'MISSING_FIELD_DERIVED'))
+      .map((f): DataQualityFlag =>
+        er && f.code === 'FINANCIAL_SECTOR'
+          ? { code: 'FINANCIAL_SECTOR', severity: 'info', message: 'A financial, valued on excess returns over book equity.' }
+          : f
+      ),
+    ...(er ? [] : scenario.flags),
+  ];
   if (wacc.betaClamped) {
     flags.push({
       code: 'BETA_CLAMPED',
@@ -216,7 +242,7 @@ export function valueFundamentals(
       message: `Risk-free rate is an assumption: ${wacc.riskFreeSource}.`,
     });
   }
-  if (dcf.forecast.some((y) => y.fcff < 0)) {
+  if (!er && dcf.forecast.some((y) => y.fcff < 0)) {
     flags.push({
       code: 'NEGATIVE_FCFF',
       severity: 'warn',
@@ -227,7 +253,7 @@ export function valueFundamentals(
   // The engine raises its own warnings (terminal capex normalisation, negative
   // cashflow). Surface them as flags so they actually reach the page - they were
   // being computed and then silently dropped.
-  for (const warning of dcf.warnings) {
+  for (const warning of er ? [] : dcf.warnings) {
     if (/steady state/i.test(warning)) {
       flags.push({ code: 'CAPEX_BELOW_DA', severity: 'warn', message: warning });
     }
@@ -237,7 +263,7 @@ export function valueFundamentals(
     fundamentals.price
   );
   if (implausible) flags.push(implausible);
-  if (dcf.gordon.terminal.blocked) {
+  if (!er && dcf.gordon.terminal.blocked) {
     flags.push({
       code: 'TERMINAL_GROWTH_BLOCKED',
       severity: 'error',
@@ -260,6 +286,7 @@ export function valueFundamentals(
     assumptions,
     wacc,
     dcf,
+    excessReturns: er,
     sensitivity,
     implied,
     valuePerShareQuoted,
@@ -268,6 +295,7 @@ export function valueFundamentals(
     scenario: request.scenario,
     modified: Object.keys(overrides).length > 0,
     flags,
-    notes: scenario.notes,
+    // Scenario notes are about the exit multiple and capex, neither shown for a bank.
+    notes: er ? [] : scenario.notes,
   };
 }

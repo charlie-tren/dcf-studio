@@ -70,8 +70,16 @@ describe('declinedByModel', () => {
     });
   }
 
-  it.each(['CBA.AX', 'RY.TO'])('declines %s, which its own page calls the wrong tool', async (t) => {
-    expect(declinedByModel((await from(t)).flags)).toBe(true);
+  it('declines anything carrying an error flag', () => {
+    expect(declinedByModel([{ severity: 'warn' }, { severity: 'error' }])).toBe(true);
+    expect(declinedByModel([{ severity: 'warn' }, { severity: 'info' }])).toBe(false);
+  });
+
+  // Declined until 10/10/2026 as the wrong tool; now valued on excess returns.
+  it.each(['CBA.AX', 'RY.TO'])('publishes %s, a bank valued on excess returns', async (t) => {
+    const v = await from(t);
+    expect(v.excessReturns).not.toBeNull();
+    expect(declinedByModel(v.flags)).toBe(false);
   });
 
   it.each(['MSFT', 'BHP.AX', 'ARB.AX'])('publishes %s, which it values', async (t) => {

@@ -145,9 +145,11 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
         <h2 className="pt-2 text-xl font-semibold text-white">Where this breaks</h2>
         <ul className="list-disc space-y-2 pl-5 leading-relaxed text-[var(--text-dim)]">
           <li>
-            <strong>Banks and insurers.</strong> They report no meaningful operating income, and
-            capex and working capital do not mean what this model assumes. A dividend-discount or
-            excess-returns model is the right tool. The model still runs, with a warning.
+            <strong>Banks and insurers.</strong> Valued on excess returns instead: book equity plus
+            the present value of return on equity above the cost of equity, with ROE at its
+            historical median fading to no more than 20% and book growing at ROE times retention.
+            Four years of history is a short read of an insurer&apos;s underwriting cycle, and there
+            is no Excel export for these.
           </li>
           <li>
             <strong>Property trusts.</strong> Reported capex can be a fraction of real investment -

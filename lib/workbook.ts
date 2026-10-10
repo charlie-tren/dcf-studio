@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import ExcelJS from 'exceljs';
 import { capexPctForYear, steadyStateCapexPct } from './dcf';
 import { majorCurrency, quoteConversionFactor } from './fx';
@@ -159,6 +160,9 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'DCF Studio';
   wb.created = new Date(0); // Deterministic: the same model exports byte-identically.
+  // ExcelJS stamps `modified` with the clock unless set, so two exports straddling
+  // a second differed and the determinism test failed intermittently.
+  wb.modified = new Date(0);
   // Belt and braces alongside the cached results: Excel recalculates on open, so
   // an edited input is reflected even before the user touches a cell.
   wb.calcProperties.fullCalcOnLoad = true;
@@ -897,5 +901,23 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     `Data: Yahoo Finance. Risk-free rate: ${v.wacc.riskFreeSource}. General information, not advice.`;
   src.getCell(`A${noteRow}`).font = { size: 9, color: { argb: GREY } };
 
-  return wb.xlsx.writeBuffer();
+  return pinZipDates(await wb.xlsx.writeBuffer());
+}
+
+/**
+ * An .xlsx is a zip, and every entry in it carries the time it was written, so two
+ * exports of one model more than two seconds apart were never byte-identical and
+ * the determinism test passed only because it built both inside a second. Re-zip
+ * with every entry dated to a fixed instant.
+ */
+async function pinZipDates(buffer: ExcelJS.Buffer): Promise<ExcelJS.Buffer> {
+  const zip = await JSZip.loadAsync(buffer as ArrayBuffer);
+  const out = new JSZip();
+  const fixed = new Date(Date.UTC(1980, 0, 1));
+  for (const name of Object.keys(zip.files).sort()) {
+    const entry = zip.files[name];
+    if (entry.dir) continue;
+    out.file(name, await entry.async('uint8array'), { date: fixed, createFolders: false });
+  }
+  return (await out.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' })) as ExcelJS.Buffer;
 }

@@ -1,7 +1,16 @@
 import { money, pct } from '@/lib/format';
 import type { WaccBreakdown } from '@/lib/types';
 
-export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string }) {
+export function WaccTable({
+  w,
+  currency,
+  equityOnly = false,
+}: {
+  w: WaccBreakdown;
+  currency: string;
+  /** A bank is valued on equity alone, so the debt and WACC rows do not apply. */
+  equityOnly?: boolean;
+}) {
   const rows: { label: string; value: string; note: string; total?: boolean }[] = [
     {
       label: 'Risk-free rate',
@@ -43,13 +52,15 @@ export function WaccTable({ w, currency }: { w: WaccBreakdown; currency: string 
   return (
     <section>
       <h2 className="text-lg font-semibold text-white">Discount Rate</h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
+      {!equityOnly && (
+        <p className="mt-1 max-w-2xl text-sm text-[var(--text-dim)]">
 Source shown per component. All overridable above.
-      </p>
+        </p>
+      )}
       <div className="mt-4 overflow-x-auto scroll-subtle rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
           <tbody>
-            {rows.map((r) => (
+            {(equityOnly ? rows.slice(0, 4) : rows).map((r) => (
               <tr
                 key={r.label}
                 className={`border-t border-[var(--border)] first:border-t-0 ${

@@ -279,6 +279,12 @@ function buildYear(
     interestExpense,
     investedCapital: investedCapital(row),
     tradeWorkingCapital: tradeWorkingCapital(row),
+    netIncomeCommon: firstOf(row, ['netIncomeCommonStockholders', 'netIncome']),
+    bookEquity: firstOf(row, ['commonStockEquity', 'stockholdersEquity']),
+    dividendsPaid: (() => {
+      const paid = firstOf(row, ['cashDividendsPaid', 'commonStockDividendPaid']);
+      return paid ? { value: -paid.value, provenance: paid.provenance } : null;
+    })(),
   };
 }
 

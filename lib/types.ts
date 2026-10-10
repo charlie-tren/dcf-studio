@@ -70,6 +70,11 @@ export type FiscalYear = {
   shares: Sourced<number>;
   interestExpense: Sourced<number> | null;
   /** Equity + debt - cash, for ROIC. Null where not reported. */
+  /** For the excess-returns model on financials. Null where not reported. */
+  netIncomeCommon: Sourced<number> | null;
+  bookEquity: Sourced<number> | null;
+  /** Positive: cash paid out. */
+  dividendsPaid: Sourced<number> | null;
   /** Receivables + inventory - payables, a balance-sheet LEVEL. Null where any is missing. */
   tradeWorkingCapital: Sourced<number> | null;
   investedCapital: Sourced<number> | null;

@@ -49,7 +49,7 @@ export default function Home() {
           },
           {
             h: 'Known limits',
-            p: 'Financials flagged as out-of-model. Four to five years of history. Terminal capex normalised to a steady state with growth charged at g/ROIC.',
+            p: 'Financials valued on excess returns over book. Four to five years of history. Terminal capex normalised to a steady state with growth charged at g/ROIC.',
           },
         ].map((c) => (
           <div key={c.h}>

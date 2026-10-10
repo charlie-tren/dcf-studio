@@ -20,6 +20,9 @@ export const MIN_COVERAGE_SHARE = 0.5;
  * 71 banks and insurers rode a number their own source disowns into a composite
  * whose top fifth came out 26% Financials against 14% of the universe.
  *
+ * Since 10/10/2026 banks and insurers carry an excess-returns value instead, their
+ * sector flag drops to info, and they publish; this now catches the rest.
+ *
  * Same rule as `publishableRatio`, one level up: a row the page disowns must not
  * reappear as a rank on another site.
  */

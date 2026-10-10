@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import ExcelJS from 'exceljs';
 import { buildValuation, type Valuation } from '@/lib/valuation';
@@ -66,10 +66,19 @@ describe('workbook structure', () => {
   it('is deterministic - the same model exports byte-identically', async () => {
     // A timestamp in the file would make every export differ, which defeats
     // diffing two versions of a model.
+    // Built an hour apart on the clock: the zip entries inside an .xlsx carry their
+    // write time, so building both within one second proved nothing.
     const v = await valuationFor('MSFT');
-    const a = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
-    const b = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
-    expect(a.equals(b)).toBe(true);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const a = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
+      vi.setSystemTime(new Date('2026-01-01T01:00:07Z'));
+      const b = Buffer.from((await buildWorkbook(v)) as ArrayBuffer);
+      expect(a.equals(b)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -468,10 +477,11 @@ describe('workbook carries provenance and caveats', () => {
 
   it('carries the model flags into the workbook', async () => {
     // A reader who opens the file without seeing the page still needs the
-    // "this is a financial" warning.
-    const v = await valuationFor('CBA.AX');
+    // caveats. (Was a bank's sector warning until banks moved to excess returns,
+    // which the workbook does not carry and the export refuses.)
+    const v = await valuationFor('SHEL.L', 0.79);
     const wb = await open(v);
     const dump = JSON.stringify(wb.getWorksheet('Source data')!.getSheetValues());
-    expect(dump).toMatch(/financial/i);
+    expect(dump).toMatch(/Reports in USD, trades in GBp/);
   });
 });
