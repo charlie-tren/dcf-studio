@@ -22,6 +22,7 @@ shipped.
 - ~~Cost-of-debt label read "2bp" for a 200bp spread~~ - 2026-10-10, found on the AAPL page.
 
 ## Removed
+- ~~Implied duration ("years of excess growth") row in Priced In~~ - measured 11/10/2026 and declined. Over 38 non-bank names a 10-60 year solve found an answer for 12; 9 were already at or above price and 17 never reached it. Where it did, slow growers came out at 44-57 years (AAPL 57), which is the discount-rate gap restated in years; only MSFT 15, GOOGL 17, META 14, AMD 22 read cleanly. The model's moat is implicit: a fixed 10-year fade, then the company's own ROIC (capped 60%) in perpetuity.
 - ~~Assumption Stress: stress grid, solution surface, turbo trigger, price-first entry~~ - cut 11/10/2026 when the item was rescoped. The Sensitivity grid already shocks the drivers; a growth x margin surface is a second grid on a page with one; the ranking is the Priced In gaps; a price-first headline restates the same numbers. Only the plausibility check was new, and it shipped.
 - ~~Margin path from the latest year, fading to the mean~~ - measured 10/10/2026 on the 44-name sample: median 0.783 -> 0.780 fading, 0.765 holding the latest, usable 26 either way. No population gain.
 
