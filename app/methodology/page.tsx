@@ -148,8 +148,7 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
             <strong>Banks and insurers.</strong> Valued on excess returns instead: book equity plus
             the present value of return on equity above the cost of equity, with ROE at its
             historical median fading to no more than 20% and book growing at ROE times retention.
-            Four years of history is a short read of an insurer&apos;s underwriting cycle, and there
-            is no Excel export for these.
+            Four years of history is a short read of an insurer&apos;s underwriting cycle.
           </li>
           <li>
             <strong>Property trusts.</strong> Reported capex can be a fraction of real investment -

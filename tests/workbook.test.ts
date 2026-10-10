@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import ExcelJS from 'exceljs';
 import { buildValuation, type Valuation } from '@/lib/valuation';
-import { buildWorkbook } from '@/lib/workbook';
+import { buildBankWorkbook, buildWorkbook } from '@/lib/workbook';
 import type { RawTicker } from '@/lib/yahoo';
 
 /** Reads xl/workbook.xml out of the .xlsx zip, to assert on what actually ships. */
@@ -483,5 +483,82 @@ describe('workbook carries provenance and caveats', () => {
     const wb = await open(v);
     const dump = JSON.stringify(wb.getWorksheet('Source data')!.getSheetValues());
     expect(dump).toMatch(/Reports in USD, trades in GBp/);
+  });
+});
+
+describe('the bank workbook', () => {
+  async function bank(ticker: string) {
+    const raw: RawTicker = JSON.parse(readFileSync(`tests/fixtures/${ticker.replace('.', '_')}.json`, 'utf8'));
+    const v = await buildValuation(ticker, { scenario: 'base', horizonYears: 10 }, {
+      fetchTicker: async () => raw,
+      fetchFxRate: async () => 1,
+      resolveRiskFree: async () => ({ rate: 0.042, source: 'test', assumed: false }),
+    });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildBankWorkbook(v)) as ArrayBuffer);
+    return { v, wb };
+  }
+  const cached = (wb: ExcelJS.Workbook, sheet: string, ref: string): number | string => {
+    const value = wb.getWorksheet(sheet)!.getCell(ref).value;
+    if (value && typeof value === 'object' && 'result' in value) return value.result as number | string;
+    return value as number;
+  };
+
+  it.each(['CBA.AX', 'RY.TO'])('%s: recomputed from its own inputs and source rows, it ties to the page', async (t) => {
+    const { v, wb } = await bank(t);
+    const X = (ref: string) => cached(wb, 'Excess Returns', ref) as number;
+    // The chain, rebuilt here from the sheet's typed inputs and reported history only.
+    const src = wb.getWorksheet('Source data')!;
+    const years = v.fundamentals.years.length;
+    const colOf = (i: number) => String.fromCharCode('B'.charCodeAt(0) + i);
+    const num = (ref: string) => {
+      const c = src.getCell(ref).value;
+      return typeof c === 'number' ? c : null;
+    };
+    const roes: number[] = [];
+    const payouts: number[] = [];
+    for (let i = 0; i < years - 1; i++) {
+      const ni = num(`${colOf(i)}5`);
+      const open = num(`${colOf(i + 1)}6`);
+      if (ni === null || open === null || open <= 0) continue;
+      roes.push(ni / open);
+      const div = num(`${colOf(i)}7`);
+      if (ni > 0 && div !== null) payouts.push(div / ni);
+    }
+    const median = (a: number[]) => { const s = [...a].sort((p, q) => p - q); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+    const ke = X('B6') + X('B8') * X('B7');
+    const roe = median(roes);
+    const payout = Math.min(Math.max(median(payouts), 0), 1);
+    const ceiling = X('B12');
+    const g = X('B13');
+    const book = num('B6')!;
+    const shares = num('B8')!;
+    const H = 10;
+    const start = Math.min(Math.max(roe * (1 - payout), 0), 0.2);
+    const longRun = Math.min(roe, ceiling);
+    let opening = book;
+    let pv = 0;
+    for (let k = 1; k <= H; k++) {
+      pv += ((roe + (longRun - roe) * (k / H) - ke) * opening) / (1 + ke) ** k;
+      opening *= 1 + start + (g - start) * (k / H);
+    }
+    const terminal = ((longRun - ke) * opening) / (ke - g) / (1 + ke) ** H;
+    const perShare = (book + pv + terminal) / shares;
+
+    expect(X('B10')).toBeCloseTo(roe, 10);
+    expect(X('B11')).toBeCloseTo(payout, 10);
+    expect(X('B37')).toBeCloseTo(perShare, 6);
+    expect(X('B37')).toBeCloseTo(v.excessReturns!.valuePerShare, 6);
+    expect(X('B43')).toBeCloseTo(v.upside, 10);
+  });
+
+  it('carries every derived figure as a formula, not a pasted number', async () => {
+    const { wb } = await bank('CBA.AX');
+    const x = wb.getWorksheet('Excess Returns')!;
+    const typed = ['B6', 'B7', 'B8', 'B12', 'B13', 'B40', 'B41'];
+    for (const ref of ['B9', 'B10', 'B11', 'B14', 'B15', 'B16', 'B17', 'B18', 'B30', 'B31', 'B32', 'B33', 'B34', 'B35', 'B36', 'B37', 'B42', 'B43', 'C24', 'K27']) {
+      expect(x.getCell(ref).formula, ref).toBeTruthy();
+    }
+    for (const ref of typed) expect(x.getCell(ref).formula, ref).toBeFalsy();
   });
 });

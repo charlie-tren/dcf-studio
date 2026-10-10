@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { decodeState } from '@/lib/urlstate';
 import { buildValuation } from '@/lib/valuation';
-import { buildWorkbook } from '@/lib/workbook';
+import { buildBankWorkbook, buildWorkbook } from '@/lib/workbook';
 import { fetchFxRate, fetchTicker } from '@/lib/yahoo';
 import { resolveRiskFree } from '@/lib/riskfree';
 
@@ -26,12 +26,9 @@ export async function GET(request: Request) {
       { scenario: state.scenario, horizonYears: state.horizonYears, overrides: state.overrides },
       { fetchTicker: cachedFetchTicker, fetchFxRate, resolveRiskFree: (t) => resolveRiskFree(t) }
     );
-    // The workbook is the free-cashflow model. For a bank the page's number is the
-    // excess-returns value, so a workbook would reprice something else entirely.
-    if (valuation.excessReturns) {
-      return new Response('The Excel export covers the free-cashflow model, which is not how a bank or insurer is valued here.', { status: 422 });
-    }
-    const buffer = await buildWorkbook(valuation);
+    const buffer = valuation.excessReturns
+      ? await buildBankWorkbook(valuation)
+      : await buildWorkbook(valuation);
     const filename = `${ticker.replace(/[^A-Z0-9.]/gi, '')}-dcf.xlsx`;
 
     return new Response(buffer as ArrayBuffer, {

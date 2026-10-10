@@ -2,20 +2,20 @@
 
 ## Open items - Tier 0 (Auto + unblocked) first, then by Score descending
 
-Last refresh: 2026-10-11 - excess-returns model for financials and trade working capital
-shipped; Excel export for banks added in their place.
+Last refresh: 2026-10-11 - excess-returns model, its Excel workbook and trade working capital
+shipped.
 
 | ID | Item | Score | Owner | Build | Prerequisites | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Excel export for banks and insurers | 2.6 | Auto | half day | None | The export refuses them, because the workbook is the free-cashflow model. An Excess Returns sheet with live formulas (book, ROE fade, excess return, PV, terminal) would close it; check with scripts/recalc-check.ps1. |
-| 2 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
-| 3 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
+| 1 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
+| 2 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
 
 ## Shipped
 - ~~Base growth path: consensus years 1-2, fading to terminal growth, ten-year default~~ - 2026-10-10. Universe median 0.54x -> 0.67x, inside 0.5-2.0x 49% -> 60%, published 428 -> 451 (with the row below).
 - ~~Equity risk premium from Damodaran, January 2026~~ - 2026-10-10. 4.23% mature plus country premium.
 - ~~Debt that cannot tell zero from missing~~ - 2026-10-10. Components, then prior year carried, then a DEBT_UNREPORTED flag.
 - ~~JSE and TASE fixtures~~ - 2026-10-10. NPN.JO and TEVA.TA end to end.
+- ~~Excel workbook for banks and insurers~~ - 2026-10-11. Excess Returns and Source data sheets, ROE and payout medians as formulas over the reported history. Excel recalc check: 13 tickers, 5,179 cells, 0 mismatches; an injected x0.5 on per-share caught.
 - ~~Excess-returns model for banks and insurers~~ - 2026-10-11. Book plus PV of ROE above cost of equity, ROE fading to min(ROE, 20%). 27 financials: median 0.76x, 23 inside 0.5-2.0x (the pretax proxy ran at 1.28x). Universe now publishes 529 of 614, declined 136 -> 29.
 - ~~Workbook not byte-identical across exports~~ - 2026-10-11. Zip entries and `modified` carried the clock; the test only passed because it built both inside a second.
 - ~~Working capital from the trade balance, not the cashflow line~~ - 2026-10-10. Visa, Coca-Cola, Thermo, Starbucks were on the +1.0 clamp; Apple drew a 29bn release from one down year. Population-neutral (0.783x -> 0.770x); the fix is to the forecast rows.

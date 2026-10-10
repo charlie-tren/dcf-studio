@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import ExcelJS from 'exceljs';
 import { capexPctForYear, steadyStateCapexPct } from './dcf';
 import { majorCurrency, quoteConversionFactor } from './fx';
+import { ROE_CEILING } from './excessReturns';
 import { FLAG_LABEL, FLAG_ORDER } from './types';
 import type { Valuation } from './valuation';
 
@@ -156,6 +157,100 @@ function present(sheet: Sheet, freezeFirstColumn = false): void {
   ];
 }
 
+type SourceLine = [string, (y: Valuation['fundamentals']['years'][number]) => { value: number | null; note: string }];
+
+/**
+ * Reported history, provenance and the model's notes. Shared by both workbooks;
+ * `extra` writes formula rows under the reported lines and returns how many.
+ */
+function addSourceSheet(
+  wb: ExcelJS.Workbook,
+  v: Valuation,
+  lines: SourceLine[],
+  extra?: (src: Sheet, firstRow: number, years: number) => number
+): Sheet {
+  const ccy = v.fundamentals.reportingCurrency;
+  // -------------------------------------------------------------------- Source
+  const src = wb.addWorksheet('Source data');
+  present(src, true);
+  src.getColumn('A').width = 40;
+  src.getCell('A1').value = `Reported history and provenance (${millions(ccy)}, except shares)`;
+  src.getCell('A1').font = { bold: true, size: 12 };
+
+  const hist = v.fundamentals.years;
+  const fieldCol = col(hist.length);
+  src.getCell('A4').value = 'Fiscal year end';
+  src.getCell('A4').font = { bold: true };
+  hist.forEach((y, i) => {
+    const c = src.getCell(`${col(i)}4`);
+    c.value = y.periodEnd;
+    c.font = { bold: true };
+    // The dates are strings and the figures under them are numbers, so without
+    // this the header sat left while its own column sat right.
+    c.alignment = { horizontal: 'right' };
+    src.getColumn(col(i)).width = 17;
+  });
+  const fieldHeader = src.getCell(`${fieldCol}4`);
+  fieldHeader.value = 'Yahoo field, latest year';
+  fieldHeader.font = { bold: true, size: 9 };
+  fieldHeader.alignment = { indent: 1 };
+  underline(src, 4, ['A', ...hist.map((_, i) => col(i)), fieldCol]);
+
+  lines.forEach(([name, pick], k) => {
+    const row = 5 + k;
+    label(src, row, name);
+    hist.forEach((y, i) => {
+      const { value } = pick(y);
+      const c = src.getCell(`${col(i)}${row}`);
+      c.value = value;
+      c.numFmt = name === 'Diluted shares' ? '#,##0' : MONEY;
+    });
+    note(src.getCell(`${fieldCol}${row}`), pick(hist[0]).note);
+  });
+  src.getColumn(fieldCol).width = 44;
+  const extraRows = extra ? extra(src, 5 + lines.length, hist.length) : 0;
+
+  /**
+   * A merged cell does not auto-fit, so a fixed height silently guillotines the
+   * text: CBA's "a DCF will misprice it" warning shipped cut off mid-sentence,
+   * which is the one note a reader most needs to finish. Size the row from the
+   * text instead, erring long - blank space costs nothing, a lost caveat does.
+   */
+  const noteWidth = 40 + hist.length * 17 + 44;
+  function wrappedNote(row: number, text: string): void {
+    const c = src.getCell(`A${row}`);
+    c.value = text;
+    c.alignment = { wrapText: true, vertical: 'top' };
+    src.mergeCells(`A${row}:${fieldCol}${row}`);
+    const perLine = Math.max(20, Math.floor(noteWidth * 0.9));
+    src.getRow(row).height = Math.ceil(text.length / perLine) * 16 + 6;
+  }
+
+  let noteRow = 5 + lines.length + extraRows + 2;
+  src.getCell(`A${noteRow}`).value = 'Model notes';
+  src.getCell(`A${noteRow}`).font = { bold: true };
+  noteRow++;
+  const flags = [...v.flags].sort(
+    (x1, x2) => FLAG_ORDER.indexOf(x1.severity) - FLAG_ORDER.indexOf(x2.severity)
+  );
+  for (const flag of flags) {
+    // FLAG_LABEL, not the raw enum: "ERROR: This is a financial" read as a crash
+    // rather than as the caveat it is, and the page has always said "Wrong tool".
+    wrappedNote(noteRow, `${FLAG_LABEL[flag.severity]}: ${flag.message}`);
+    noteRow++;
+  }
+  for (const line of v.notes) {
+    wrappedNote(noteRow, line);
+    noteRow++;
+  }
+  noteRow++;
+  src.getCell(`A${noteRow}`).value =
+    `Data: Yahoo Finance. Risk-free rate: ${v.wacc.riskFreeSource}. General information, not advice.`;
+  src.getCell(`A${noteRow}`).font = { size: 9, color: { argb: GREY } };
+
+  return src;
+}
+
 export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'DCF Studio';
@@ -184,9 +279,6 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   a.getCell('A1').font = { bold: true, size: 14 };
   a.getCell('A2').value = `DCF Studio - ${scenarioName} case${v.modified ? ', edited' : ''}`;
   a.getCell('A2').font = { color: { argb: GREY } };
-  a.getCell('A3').value =
-    `Blue figures on a cream fill are inputs. Every other figure is a formula - change an input and the model reprices. Currency figures are ${ccy} millions unless the row says otherwise.`;
-  a.getCell('A3').font = { italic: true, color: { argb: GREY }, size: 9 };
 
   sectionHeading(a, 5, 'Drivers');
   const rows = {
@@ -812,35 +904,8 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
   });
 
   // -------------------------------------------------------------------- Source
-  const src = wb.addWorksheet('Source data');
-  present(src, true);
-  src.getColumn('A').width = 40;
-  src.getCell('A1').value = `Reported history and provenance (${millions(ccy)}, except shares)`;
-  src.getCell('A1').font = { bold: true, size: 12 };
-  src.getCell('A2').value =
-    'What the model was built from. "derived" means the figure was not reported and was computed - the note says how.';
-  src.getCell('A2').font = { italic: true, size: 9, color: { argb: GREY } };
+  addSourceSheet(wb, v, [
 
-  const hist = v.fundamentals.years;
-  const fieldCol = col(hist.length);
-  src.getCell('A4').value = 'Fiscal year end';
-  src.getCell('A4').font = { bold: true };
-  hist.forEach((y, i) => {
-    const c = src.getCell(`${col(i)}4`);
-    c.value = y.periodEnd;
-    c.font = { bold: true };
-    // The dates are strings and the figures under them are numbers, so without
-    // this the header sat left while its own column sat right.
-    c.alignment = { horizontal: 'right' };
-    src.getColumn(col(i)).width = 17;
-  });
-  const fieldHeader = src.getCell(`${fieldCol}4`);
-  fieldHeader.value = 'Yahoo field, latest year';
-  fieldHeader.font = { bold: true, size: 9 };
-  fieldHeader.alignment = { indent: 1 };
-  underline(src, 4, ['A', ...hist.map((_, i) => col(i)), fieldCol]);
-
-  const lines: [string, (y: (typeof hist)[number]) => { value: number; note: string }][] = [
     ['Revenue', (y) => ({ value: y.revenue.value, note: y.revenue.provenance.sourceField })],
     ['EBIT', (y) => ({ value: y.ebit.value, note: y.ebit.provenance.derived ? 'derived' : y.ebit.provenance.sourceField })],
     ['Depreciation & amortisation', (y) => ({ value: y.dAndA.value, note: y.dAndA.provenance.sourceField })],
@@ -849,57 +914,7 @@ export async function buildWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
     ['Total debt', (y) => ({ value: y.totalDebt.value, note: y.totalDebt.provenance.sourceField })],
     ['Cash and equivalents', (y) => ({ value: y.cash.value, note: y.cash.provenance.sourceField })],
     ['Diluted shares', (y) => ({ value: y.shares.value, note: y.shares.provenance.sourceField })],
-  ];
-  lines.forEach(([name, pick], k) => {
-    const row = 5 + k;
-    label(src, row, name);
-    hist.forEach((y, i) => {
-      const { value } = pick(y);
-      const c = src.getCell(`${col(i)}${row}`);
-      c.value = value;
-      c.numFmt = name === 'Diluted shares' ? '#,##0' : MONEY;
-    });
-    note(src.getCell(`${fieldCol}${row}`), pick(hist[0]).note);
-  });
-  src.getColumn(fieldCol).width = 44;
-
-  /**
-   * A merged cell does not auto-fit, so a fixed height silently guillotines the
-   * text: CBA's "a DCF will misprice it" warning shipped cut off mid-sentence,
-   * which is the one note a reader most needs to finish. Size the row from the
-   * text instead, erring long - blank space costs nothing, a lost caveat does.
-   */
-  const noteWidth = 40 + hist.length * 17 + 44;
-  function wrappedNote(row: number, text: string): void {
-    const c = src.getCell(`A${row}`);
-    c.value = text;
-    c.alignment = { wrapText: true, vertical: 'top' };
-    src.mergeCells(`A${row}:${fieldCol}${row}`);
-    const perLine = Math.max(20, Math.floor(noteWidth * 0.9));
-    src.getRow(row).height = Math.ceil(text.length / perLine) * 16 + 6;
-  }
-
-  let noteRow = 5 + lines.length + 2;
-  src.getCell(`A${noteRow}`).value = 'Model notes';
-  src.getCell(`A${noteRow}`).font = { bold: true };
-  noteRow++;
-  const flags = [...v.flags].sort(
-    (x1, x2) => FLAG_ORDER.indexOf(x1.severity) - FLAG_ORDER.indexOf(x2.severity)
-  );
-  for (const flag of flags) {
-    // FLAG_LABEL, not the raw enum: "ERROR: This is a financial" read as a crash
-    // rather than as the caveat it is, and the page has always said "Wrong tool".
-    wrappedNote(noteRow, `${FLAG_LABEL[flag.severity]}: ${flag.message}`);
-    noteRow++;
-  }
-  for (const line of v.notes) {
-    wrappedNote(noteRow, line);
-    noteRow++;
-  }
-  noteRow++;
-  src.getCell(`A${noteRow}`).value =
-    `Data: Yahoo Finance. Risk-free rate: ${v.wacc.riskFreeSource}. General information, not advice.`;
-  src.getCell(`A${noteRow}`).font = { size: 9, color: { argb: GREY } };
+    ]);
 
   return pinZipDates(await wb.xlsx.writeBuffer());
 }
@@ -920,4 +935,206 @@ async function pinZipDates(buffer: ExcelJS.Buffer): Promise<ExcelJS.Buffer> {
     out.file(name, await entry.async('uint8array'), { date: fixed, createFolders: false });
   }
   return (await out.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' })) as ExcelJS.Buffer;
+}
+
+/**
+ * The bank and insurer workbook: the excess-returns model, live, on the same terms
+ * as the free-cashflow one. Inputs typed, everything else a formula, and ROE and
+ * payout computed from the reported history on the Source data sheet rather than
+ * pasted, so the medians trace back to the accounts.
+ */
+export async function buildBankWorkbook(v: Valuation): Promise<ExcelJS.Buffer> {
+  const er = v.excessReturns;
+  if (!er) throw new Error('buildBankWorkbook needs an excess-returns valuation.');
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'DCF Studio';
+  wb.created = new Date(0);
+  wb.modified = new Date(0);
+  wb.calcProperties.fullCalcOnLoad = true;
+
+  const ccy = v.fundamentals.reportingCurrency;
+  const hist = v.fundamentals.years;
+  const n = er.years.length;
+  const last = col(n - 1);
+  const SRC = "'Source data'";
+  const startGrowth = Math.min(Math.max(er.roe * (1 - er.payout), 0), 0.2);
+
+  // A blank formula result is cached as text, so MEDIAN skips it as Excel would.
+  function maybe(sheet: Sheet, ref: string, formula: string, numFmt: string, result: number | null): void {
+    const cell = sheet.getCell(ref);
+    cell.value = { formula, result: result ?? '', date1904: false };
+    cell.numFmt = numFmt;
+  }
+
+  const x = wb.addWorksheet('Excess Returns');
+  present(x, true);
+  x.getColumn('A').width = 40;
+  for (let i = 0; i < n; i++) x.getColumn(col(i)).width = 13;
+
+  x.getCell('A1').value = `${v.fundamentals.name} (${v.fundamentals.ticker})`;
+  x.getCell('A1').font = { bold: true, size: 14 };
+  x.getCell('A2').value = 'DCF Studio - excess returns over book equity';
+  x.getCell('A2').font = { color: { argb: GREY } };
+
+  // Source data rows: four reported lines from row 5, then ROE and payout per year.
+  const srow = { ni: 5, book: 6, div: 7, shares: 8, roe: 9, payout: 10 };
+  const roeByYear: (number | null)[] = hist.map((y, i) => {
+    const ni = y.netIncomeCommon?.value;
+    const opening = hist[i + 1]?.bookEquity?.value;
+    return ni !== undefined && opening !== undefined && opening > 0 ? ni / opening : null;
+  });
+  const payoutByYear: (number | null)[] = hist.map((y, i) => {
+    const ni = y.netIncomeCommon?.value;
+    const paid = y.dividendsPaid?.value;
+    return roeByYear[i] !== null && ni !== undefined && ni > 0 && paid !== undefined ? paid / ni : null;
+  });
+
+  const inp = {
+    rf: 6, erp: 7, beta: 8, ke: 9, roe: 10, payout: 11, ceiling: 12, g: 13,
+    book: 14, shares: 15, horizon: 16, startGrowth: 17, longRunRoe: 18,
+  };
+  sectionHeading(x, 5, 'Inputs');
+  label(x, inp.rf, 'Risk-free rate');
+  label(x, inp.erp, 'Equity risk premium');
+  label(x, inp.beta, 'Beta');
+  label(x, inp.ke, 'Cost of equity');
+  label(x, inp.roe, 'Return on equity, median');
+  label(x, inp.payout, 'Payout, median');
+  label(x, inp.ceiling, 'Return on equity ceiling');
+  label(x, inp.g, 'Terminal growth');
+  label(x, inp.book, `Book equity (${millions(ccy)})`);
+  label(x, inp.shares, 'Diluted shares');
+  label(x, inp.horizon, 'Years');
+  label(x, inp.startGrowth, 'Book growth, year 1');
+  label(x, inp.longRunRoe, 'Return on equity, final year');
+
+  inputCell(x, `B${inp.rf}`, v.wacc.riskFreeRate, RATE);
+  note(x.getCell(`C${inp.rf}`), v.wacc.riskFreeSource);
+  inputCell(x, `B${inp.erp}`, v.wacc.equityRiskPremium, RATE);
+  note(x.getCell(`C${inp.erp}`), 'Damodaran, January 2026');
+  inputCell(x, `B${inp.beta}`, v.wacc.beta, '0.000');
+  formulaCell(x, `B${inp.ke}`, `B${inp.rf}+B${inp.beta}*B${inp.erp}`, RATE, er.costOfEquity);
+  const histLast = col(hist.length - 1);
+  formulaCell(x, `B${inp.roe}`, `MEDIAN(${SRC}!B${srow.roe}:${histLast}${srow.roe})`, RATE, er.roe);
+  formulaCell(
+    x,
+    `B${inp.payout}`,
+    `IFERROR(MIN(MAX(MEDIAN(${SRC}!B${srow.payout}:${histLast}${srow.payout}),0),1),0)`,
+    RATE,
+    er.payout
+  );
+  inputCell(x, `B${inp.ceiling}`, ROE_CEILING, RATE);
+  inputCell(x, `B${inp.g}`, er.terminalGrowth, RATE);
+  formulaCell(x, `B${inp.book}`, `${SRC}!B${srow.book}`, MONEY, er.bookValue);
+  formulaCell(x, `B${inp.shares}`, `${SRC}!B${srow.shares}`, '#,##0', hist[0].shares.value);
+  formulaCell(x, `B${inp.horizon}`, `COUNT(B21:${last}21)`, '0', n);
+  formulaCell(x, `B${inp.startGrowth}`, `MIN(MAX(B${inp.roe}*(1-B${inp.payout}),0),0.2)`, RATE, startGrowth);
+  formulaCell(x, `B${inp.longRunRoe}`, `MIN(B${inp.roe},B${inp.ceiling})`, RATE, er.years[n - 1].roe);
+
+  // ------------------------------------------------------------------ Forecast
+  const r = { head: 20, t: 21, roe: 22, growth: 23, book: 24, excess: 25, df: 26, pv: 27 };
+  label(x, r.head, millions(ccy)).font = { bold: true };
+  label(x, r.t, 'Year');
+  label(x, r.roe, 'Return on equity');
+  label(x, r.growth, 'Book growth');
+  label(x, r.book, 'Opening book equity');
+  label(x, r.excess, 'Excess return');
+  label(x, r.df, 'Discount factor');
+  label(x, r.pv, 'Present value').font = { bold: true };
+  const H = `$B$${inp.horizon}`;
+  er.years.forEach((y, i) => {
+    const c = col(i);
+    const p = i === 0 ? null : col(i - 1);
+    const head = x.getCell(`${c}${r.head}`);
+    head.value = v.forecastYearLabels[i] ?? `Year ${i + 1}`;
+    head.font = { bold: true };
+    head.alignment = { horizontal: 'right' };
+    formulaCell(x, `${c}${r.t}`, p ? `${p}${r.t}+1` : '1', '0', i + 1);
+    formulaCell(x, `${c}${r.roe}`, `$B$${inp.roe}+($B$${inp.longRunRoe}-$B$${inp.roe})*${c}${r.t}/${H}`, RATE, y.roe);
+    formulaCell(
+      x,
+      `${c}${r.growth}`,
+      `$B$${inp.startGrowth}+($B$${inp.g}-$B$${inp.startGrowth})*${c}${r.t}/${H}`,
+      RATE,
+      startGrowth + (er.terminalGrowth - startGrowth) * ((i + 1) / n)
+    );
+    formulaCell(x, `${c}${r.book}`, p ? `${p}${r.book}*(1+${p}${r.growth})` : `$B$${inp.book}`, MONEY, y.openingBook);
+    formulaCell(x, `${c}${r.excess}`, `(${c}${r.roe}-$B$${inp.ke})*${c}${r.book}`, MONEY, y.excessReturn);
+    formulaCell(x, `${c}${r.df}`, `1/(1+$B$${inp.ke})^${c}${r.t}`, '0.0000', 1 / (1 + er.costOfEquity) ** (i + 1));
+    formulaCell(x, `${c}${r.pv}`, `${c}${r.excess}*${c}${r.df}`, MONEY, y.presentValue).font = { bold: true };
+  });
+  underline(x, r.head, ['A', ...er.years.map((_, i) => col(i))]);
+
+  // --------------------------------------------------------------------- Value
+  const b = { book: 30, pv: 31, closing: 32, termExcess: 33, tv: 34, tvPv: 35, equity: 36, perShare: 37 };
+  sectionHeading(x, 29, `Value (${millions(ccy)}, except per share)`);
+  label(x, b.book, 'Book equity');
+  label(x, b.pv, 'Present value of excess returns');
+  label(x, b.closing, 'Book equity after the final year');
+  label(x, b.termExcess, 'Excess return after the final year');
+  label(x, b.tv, 'Terminal value');
+  label(x, b.tvPv, 'Terminal value, discounted');
+  label(x, b.equity, 'Equity value').font = { bold: true };
+  label(x, b.perShare, `Value per share (${ccy})`).font = { bold: true };
+  const closing = er.years[n - 1].openingBook * (1 + er.terminalGrowth);
+  formulaCell(x, `B${b.book}`, `B${inp.book}`, MONEY, er.bookValue);
+  formulaCell(x, `B${b.pv}`, `SUM(B${r.pv}:${last}${r.pv})`, MONEY, er.pvExcess);
+  formulaCell(x, `B${b.closing}`, `${last}${r.book}*(1+${last}${r.growth})`, MONEY, closing);
+  formulaCell(x, `B${b.termExcess}`, `(B${inp.longRunRoe}-B${inp.ke})*B${b.closing}`, MONEY, er.terminalExcess);
+  formulaCell(x, `B${b.tv}`, `B${b.termExcess}/(B${inp.ke}-B${inp.g})`, MONEY, er.terminalValue);
+  formulaCell(x, `B${b.tvPv}`, `B${b.tv}*${last}${r.df}`, MONEY, er.terminalPresentValue);
+  formulaCell(x, `B${b.equity}`, `B${b.book}+B${b.pv}+B${b.tvPv}`, MONEY, er.equityValue).font = { bold: true };
+  formulaCell(x, `B${b.perShare}`, `B${b.equity}/B${inp.shares}`, PER_SHARE, er.valuePerShare).font = { bold: true };
+
+  const quote = v.fundamentals.quoteCurrency;
+  const conversion = quoteConversionFactor({ reportingCurrency: ccy, quoteCurrency: quote, fxRate: v.fxRate });
+  const m = { price: 40, conversion: 41, perShare: 42, upside: 43 };
+  sectionHeading(x, 39, 'Against the market');
+  label(x, m.price, `Market price (${quote})`);
+  label(x, m.conversion, `Conversion, ${ccy} to ${quote}`);
+  label(x, m.perShare, `Value per share (${quote})`);
+  label(x, m.upside, 'Implied upside').font = { bold: true };
+  inputCell(x, `B${m.price}`, v.fundamentals.price, PER_SHARE);
+  inputCell(x, `B${m.conversion}`, conversion, '0.0000');
+  formulaCell(x, `B${m.perShare}`, `B${b.perShare}*B${m.conversion}`, PER_SHARE, v.valuePerShareQuoted);
+  formulaCell(x, `B${m.upside}`, `B${m.perShare}/B${m.price}-1`, RATE, v.upside).font = { bold: true };
+
+  // ------------------------------------------------------------------- Source
+  addSourceSheet(
+    wb,
+    v,
+    [
+      ['Net income to common', (y) => ({ value: y.netIncomeCommon?.value ?? null, note: y.netIncomeCommon?.provenance.sourceField ?? 'not reported' })],
+      ['Book equity', (y) => ({ value: y.bookEquity?.value ?? null, note: y.bookEquity?.provenance.sourceField ?? 'not reported' })],
+      ['Dividends paid', (y) => ({ value: y.dividendsPaid?.value ?? null, note: y.dividendsPaid?.provenance.sourceField ?? 'not reported' })],
+      ['Diluted shares', (y) => ({ value: y.shares.value, note: y.shares.provenance.sourceField })],
+    ],
+    (src, _first, years) => {
+      label(src, srow.roe, 'Return on opening equity');
+      label(src, srow.payout, 'Payout');
+      for (let i = 0; i < years; i++) {
+        const c = col(i);
+        const prior = col(i + 1);
+        maybe(
+          src,
+          `${c}${srow.roe}`,
+          i + 1 < years
+            ? `IF(AND(ISNUMBER(${c}${srow.ni}),N(${prior}${srow.book})>0),${c}${srow.ni}/${prior}${srow.book},"")`
+            : '""',
+          RATE,
+          roeByYear[i]
+        );
+        maybe(
+          src,
+          `${c}${srow.payout}`,
+          `IF(AND(ISNUMBER(${c}${srow.roe}),N(${c}${srow.ni})>0,ISNUMBER(${c}${srow.div})),${c}${srow.div}/${c}${srow.ni},"")`,
+          RATE,
+          payoutByYear[i]
+        );
+      }
+      return 2;
+    }
+  );
+
+  return pinZipDates(await wb.xlsx.writeBuffer());
 }
