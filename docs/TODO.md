@@ -7,8 +7,8 @@ shipped.
 
 | ID | Item | Score | Owner | Build | Prerequisites | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
-| 2 | Market-implied expectations mode (Assumption Stress) | 2.8 | User | >2 days | Charlie reads Expectations Investing | Price-first page: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
+| 1 | Market-implied expectations mode (Assumption Stress) | 3.2 | Auto | 2 days | None | Price-first upgrade of the Priced In panel, beside the DCF: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
+| 2 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
 
 ## Shipped
 - ~~Base growth path: consensus years 1-2, fading to terminal growth, ten-year default~~ - 2026-10-10. Universe median 0.54x -> 0.67x, inside 0.5-2.0x 49% -> 60%, published 428 -> 451 (with the row below).
@@ -40,11 +40,12 @@ shipped.
   Requested 30/07 and sharpened 05/08/2026; merged into one item 17/08 because the second
   entry was the build spec for the first, not a separate project.
 
-  **Step 1 - read Expectations Investing** (Mauboussin & Rappaport). The book inverts the
-  usual exercise: rather than forecasting cashflows to reach a value, start from the market
-  price and solve for the expectations embedded in it, then judge whether those are
-  beatable. Read before building - the point of the read is to decide whether this REPLACES
-  the DCF-first framing or sits beside it as a second mode.
+  **Framing - DECIDED 11/10/2026: beside the DCF, not replacing it.** Expectations
+  Investing (Mauboussin & Rappaport) starts from the price and solves for the expectations
+  in it. That is an upgrade of the Priced In panel, not a new page: the DCF, the Excel
+  export and Crosscheck's ratio stay as they are. This step used to read "read the book
+  first" and sat for two months as Owner: User because it named no reader; it was never
+  waiting on Charlie.
 
   **Step 2 - build.** `lib/backsolve.ts` and the "Priced In" panel are a crude first step;
   the full version is:
