@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { impliedExpectations } from '@/lib/backsolve';
+import { averageGrowth, impliedExpectations } from '@/lib/backsolve';
 import { runDcf } from '@/lib/dcf';
 import { cagr } from '@/lib/format';
 import type { Assumptions, DcfInputs } from '@/lib/types';
@@ -38,9 +38,10 @@ describe('impliedExpectations', () => {
 
     const viaGrowth = runDcf(I, {
       ...A,
-      revenueGrowth: Array(5).fill(r.revenueGrowth as number),
+      revenueGrowth: r.revenueGrowthPath as number[],
     }).gordon.valuePerShare;
     expect(viaGrowth).toBeCloseTo(target, 2);
+    expect(r.revenueGrowth).toBeCloseTo(averageGrowth(r.revenueGrowthPath as number[]), 12);
 
     const viaMargin = runDcf(I, {
       ...A,
@@ -69,6 +70,25 @@ describe('impliedExpectations', () => {
     // No margin inside the bracket makes a company worth 500x its own model.
     const r = impliedExpectations(I, A, modelled * 500);
     expect(r.ebitMargin).toBeNull();
+  });
+
+  it('keeps the model path shape: the shift tapers to nothing in the final year', () => {
+    // A fading path, like the base case's.
+    const fading = { ...A, revenueGrowth: [0.2, 0.15, 0.1, 0.06, 0.025] };
+    const base = runDcf(I, fading).gordon.valuePerShare;
+    const r = impliedExpectations(I, fading, base * 1.8);
+    const path = r.revenueGrowthPath as number[];
+    expect(path[4]).toBeCloseTo(0.025, 10);
+    const shift = (path[0] - 0.2) / (1 - 1 / 5);
+    path.forEach((g, i) => expect(g).toBeCloseTo(fading.revenueGrowth[i] + shift * (1 - (i + 1) / 5), 10));
+    expect(shift).toBeGreaterThan(0);
+  });
+
+  it('returns the model path unchanged when the price is the model value', () => {
+    const fading = { ...A, revenueGrowth: [0.2, 0.15, 0.1, 0.06, 0.025] };
+    const r = impliedExpectations(I, fading, runDcf(I, fading).gordon.valuePerShare);
+    (r.revenueGrowthPath as number[]).forEach((g, i) => expect(g).toBeCloseTo(fading.revenueGrowth[i], 6));
+    expect(r.revenueGrowth).toBeCloseTo(averageGrowth(fading.revenueGrowth), 6);
   });
 
   it('never solves for a discount rate at or below terminal growth', () => {

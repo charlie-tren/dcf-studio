@@ -136,7 +136,10 @@ WACC           = E/V x Re + D/V x Rd x (1 - tax rate)`}</pre>
           Each input is also solved in reverse: what would revenue growth, margin, or the discount
           rate have to be for today&apos;s price to hold, with the others left where the model has them.
           Bisection against the same engine that produces the headline. Each answer holds the other
-          inputs where they are, so they are alternatives, not a set. Returns nothing where the price is unreachable in any input, rather
+          inputs where they are, so they are alternatives, not a set. Growth is solved as a shift to
+          the model&apos;s own path that tapers to nothing by the final year, so it still fades to
+          terminal growth. Actual is revenue growth over the reported years and the best
+          reported EBIT margin. Returns nothing where the price is unreachable in any input, rather
           than extrapolating past the bracket.
         </p>
       </section>

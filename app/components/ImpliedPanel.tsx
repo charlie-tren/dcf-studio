@@ -1,5 +1,6 @@
 import { pct } from '@/lib/format';
-import type { ImpliedExpectations } from '@/lib/backsolve';
+import { averageGrowth, type ImpliedExpectations } from '@/lib/backsolve';
+import type { Delivered } from '@/lib/valuation';
 import type { Assumptions } from '@/lib/types';
 
 /**
@@ -10,23 +11,32 @@ import type { Assumptions } from '@/lib/types';
 export function ImpliedPanel({
   implied,
   assumptions,
+  delivered,
 }: {
   implied: ImpliedExpectations;
   assumptions: Assumptions;
+  delivered: Delivered;
 }) {
   const rows = [
     {
-      label: 'Revenue growth, every year',
-      // The solve is one flat rate for every year, so compare it with the
-      // path's average, not its first year: the base path fades to terminal growth.
-      modelled:
-        assumptions.revenueGrowth.reduce((acc, g) => acc * (1 + g), 1) **
-          (1 / assumptions.revenueGrowth.length) -
-        1,
+      label: 'Revenue growth, a year',
+      delivered: delivered.revenueGrowth,
+      modelled: averageGrowth(assumptions.revenueGrowth),
       solved: implied.revenueGrowth,
     },
-    { label: 'EBIT margin', modelled: assumptions.ebitMargin[0], solved: implied.ebitMargin },
-    { label: 'Discount rate', modelled: assumptions.wacc, solved: implied.wacc, inverted: true },
+    {
+      label: 'EBIT margin',
+      delivered: delivered.bestEbitMargin,
+      modelled: assumptions.ebitMargin[0],
+      solved: implied.ebitMargin,
+    },
+    {
+      label: 'Discount rate',
+      delivered: null,
+      modelled: assumptions.wacc,
+      solved: implied.wacc,
+      inverted: true,
+    },
   ].filter((r) => r.solved !== null);
 
   if (rows.length === 0) return null;
@@ -42,16 +52,23 @@ What each input would have to be to justify the current price, one at a time.
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[var(--surface)]">
-              <th className="px-4 py-2.5 text-left text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
+              <th className="px-2 py-2.5 sm:px-4 text-left text-[11px] font-medium sm:tracking-wider text-[var(--text-faint)] uppercase">
                 Input
               </th>
-              <th className="px-4 py-2.5 text-right text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
+              <th
+                className="px-2 py-2.5 sm:px-4 text-right text-[11px] font-medium sm:tracking-wider text-[var(--text-faint)] uppercase"
+                title={`Revenue: growth a year over the ${delivered.years} reported years. Margin: the best reported year.`}
+              >
+                Actual
+              </th>
+              <th className="px-2 py-2.5 sm:px-4 text-right text-[11px] font-medium sm:tracking-wider text-[var(--text-faint)] uppercase">
 Model
               </th>
-              <th className="px-4 py-2.5 text-right text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
+              <th className="px-2 py-2.5 sm:px-4 text-right text-[11px] font-medium sm:tracking-wider text-[var(--text-faint)] uppercase">
 Implied
               </th>
-              <th className="px-4 py-2.5 text-right text-[11px] font-medium tracking-wider text-[var(--text-faint)] uppercase">
+              {/* Implied less Model, two columns over: on a phone the label needs the room more. */}
+              <th className="hidden px-2 py-2.5 sm:table-cell sm:px-4 text-right text-[11px] font-medium sm:tracking-wider text-[var(--text-faint)] uppercase">
                 Gap
               </th>
             </tr>
@@ -65,15 +82,18 @@ Implied
               const demanding = r.inverted ? gap < 0 : gap > 0;
               return (
                 <tr key={r.label} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-2.5 text-[var(--text-dim)]">{r.label}</td>
-                  <td className="nums px-4 py-2.5 text-right text-[var(--text-dim)]">
+                  <td className="px-2 py-2.5 sm:px-4 text-[var(--text-dim)]">{r.label}</td>
+                  <td className="nums px-2 py-2.5 sm:px-4 text-right text-[var(--text-dim)]">
+                    {r.delivered === null ? '-' : pct(r.delivered, 1)}
+                  </td>
+                  <td className="nums px-2 py-2.5 sm:px-4 text-right text-[var(--text-dim)]">
                     {pct(r.modelled, 1)}
                   </td>
-                  <td className="nums px-4 py-2.5 text-right font-medium text-[var(--text)]">
+                  <td className="nums px-2 py-2.5 sm:px-4 text-right font-medium text-[var(--text)]">
                     {pct(solved, 1)}
                   </td>
                   <td
-                    className={`nums px-4 py-2.5 text-right ${
+                    className={`nums hidden px-2 py-2.5 sm:table-cell sm:px-4 text-right ${
                       demanding ? 'text-[var(--negative)]' : 'text-[var(--accent)]'
                     }`}
                   >

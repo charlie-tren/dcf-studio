@@ -179,3 +179,17 @@ describe('buildValuation - every fixture yields a finite, sane result', () => {
     }
   });
 });
+
+describe('delivered', () => {
+  it('is revenue growth a year across the reported years and the best reported margin', async () => {
+    const v = await buildValuation('MSFT', { scenario: 'base', horizonYears: 10 }, deps('MSFT'));
+    const ys = v.fundamentals.years;
+    const n = ys.length - 1;
+    expect(v.delivered.years).toBe(ys.length);
+    expect(v.delivered.revenueGrowth).toBeCloseTo((ys[0].revenue.value / ys[n].revenue.value) ** (1 / n) - 1, 12);
+    const margins = ys.map((y) => y.ebit.value / y.revenue.value);
+    expect(v.delivered.bestEbitMargin).toBe(Math.max(...margins));
+    // The best year, not the average the model already runs on.
+    expect(v.delivered.bestEbitMargin as number).toBeGreaterThanOrEqual(v.assumptions.ebitMargin[0]);
+  });
+});

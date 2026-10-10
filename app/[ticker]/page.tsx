@@ -146,7 +146,11 @@ export default async function ModelPage({ params, searchParams }: Props) {
           currency={reportingCurrency}
           centrePrice={priceInReporting}
         />
-        <ImpliedPanel implied={valuation.implied} assumptions={valuation.assumptions} />
+        <ImpliedPanel
+          implied={valuation.implied}
+          assumptions={valuation.assumptions}
+          delivered={valuation.delivered}
+        />
         </>
       )}
 

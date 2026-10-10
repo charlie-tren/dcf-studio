@@ -7,10 +7,10 @@ shipped.
 
 | ID | Item | Score | Owner | Build | Prerequisites | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Market-implied expectations mode (Assumption Stress) | 3.2 | Auto | 2 days | None | Price-first upgrade of the Priced In panel, beside the DCF: implied growth, margin and duration surface, turbo trigger, plausibility against delivered history, stress grid. |
-| 2 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
+| 1 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
 
 ## Shipped
+- ~~Assumption Stress, rescoped to the Priced In panel~~ - 2026-10-11. An Actual column (revenue growth over the reported years, best reported EBIT margin) beside Model and Implied, and the growth solve now shifts the model's own path, tapering to zero by the final year, instead of a flat ten-year rate. AAPL: price needs 16.9% growth a year against 1.8% actual, or a 66.6% margin against a best of 32.0%. Gap hidden below `sm`, where the table had to scroll 97px.
 - ~~Base growth path: consensus years 1-2, fading to terminal growth, ten-year default~~ - 2026-10-10. Universe median 0.54x -> 0.67x, inside 0.5-2.0x 49% -> 60%, published 428 -> 451 (with the row below).
 - ~~Equity risk premium from Damodaran, January 2026~~ - 2026-10-10. 4.23% mature plus country premium.
 - ~~Debt that cannot tell zero from missing~~ - 2026-10-10. Components, then prior year carried, then a DEBT_UNREPORTED flag.
@@ -22,6 +22,7 @@ shipped.
 - ~~Cost-of-debt label read "2bp" for a 200bp spread~~ - 2026-10-10, found on the AAPL page.
 
 ## Removed
+- ~~Assumption Stress: stress grid, solution surface, turbo trigger, price-first entry~~ - cut 11/10/2026 when the item was rescoped. The Sensitivity grid already shocks the drivers; a growth x margin surface is a second grid on a page with one; the ranking is the Priced In gaps; a price-first headline restates the same numbers. Only the plausibility check was new, and it shipped.
 - ~~Margin path from the latest year, fading to the mean~~ - measured 10/10/2026 on the 44-name sample: median 0.783 -> 0.780 fading, 0.765 holding the latest, usable 26 either way. No population gain.
 
 ## Item details
@@ -36,7 +37,9 @@ shipped.
   parallel and merges on symbol. Verified live: woolworths, telstra, csl and commonwealth
   bank all lead with the .AX line, and microsoft still leads with MSFT.
 
-- [ ] **Market-implied expectations as a first-class mode ("Assumption Stress").**
+- [x] **Market-implied expectations as a first-class mode ("Assumption Stress").** RESCOPED
+  AND SHIPPED 11/10/2026 as the Priced In panel's Actual column and path-shaped growth
+  solve; the rest cut (see Shipped and Removed at the top). Original spec kept below.
   Requested 30/07 and sharpened 05/08/2026; merged into one item 17/08 because the second
   entry was the build spec for the first, not a separate project.
 

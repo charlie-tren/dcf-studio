@@ -61,6 +61,8 @@ export type Valuation = {
   sensitivity: SensitivityGrid;
   /** What each input would have to be for today's price to be right. */
   implied: ImpliedExpectations;
+  /** What the company has actually done, for the Priced In panel to compare against. */
+  delivered: Delivered;
   /** Value per share in the units the market quotes in, comparable to price. */
   valuePerShareQuoted: number;
   fxRate: number;
@@ -71,6 +73,31 @@ export type Valuation = {
   flags: DataQualityFlag[];
   notes: string[];
 };
+
+export type Delivered = {
+  /** Revenue growth a year across the reported years. */
+  revenueGrowth: number | null;
+  /**
+   * The best EBIT margin in any reported year. Not the average: the model's own
+   * margin already IS the historical average, so that would repeat the Model column.
+   * The best year is the ceiling the question needs - has it ever earned this?
+   */
+  bestEbitMargin: number | null;
+  /** Reported years the figures span. */
+  years: number;
+};
+
+export function delivered(f: Fundamentals): Delivered {
+  const years = f.years.filter((y) => y.revenue.value > 0);
+  const spans = years.length - 1;
+  return {
+    revenueGrowth:
+      spans > 0 ? (years[0].revenue.value / years[spans].revenue.value) ** (1 / spans) - 1 : null,
+    bestEbitMargin:
+      years.length > 0 ? Math.max(...years.map((y) => y.ebit.value / y.revenue.value)) : null,
+    years: years.length,
+  };
+}
 
 /** Order of magnitude between the model and the market, or null if the gap is
  *  merely a disagreement.
@@ -289,6 +316,7 @@ export function valueFundamentals(
     excessReturns: er,
     sensitivity,
     implied,
+    delivered: delivered(fundamentals),
     valuePerShareQuoted,
     fxRate,
     upside: fundamentals.price > 0 ? valuePerShareQuoted / fundamentals.price - 1 : 0,
