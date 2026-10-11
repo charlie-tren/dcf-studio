@@ -15,9 +15,6 @@ export default function Home() {
       <h1 className="text-4xl font-semibold tracking-tight text-white">
         DCF on any listed company
       </h1>
-      <p className="mt-4 max-w-xl text-lg text-[var(--text-dim)]">
-        Built off reported financials. Every driver editable, every line traceable to source.
-      </p>
 
       <div className="mt-10">
         <Suspense fallback={null}>
