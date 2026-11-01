@@ -42,4 +42,16 @@ jobs:
           git add lib/peers.json
           git diff --staged --quiet && echo "coverage unchanged" && exit 0
           git commit -m "peers: weekly coverage refresh"
-          git push
+          # Same replay as valuations.yml, --mixed for the same reason.
+          for attempt in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "push attempt $attempt lost a race - replaying onto master"
+            git fetch origin master
+            git reset --mixed origin/master
+            git add lib/peers.json
+            git diff --staged --quiet && exit 0
+            git commit -m "peers: weekly coverage refresh"
+            sleep 3
+          done
+          echo "::error::could not push after 3 attempts"
+          exit 1
