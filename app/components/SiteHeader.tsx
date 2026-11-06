@@ -22,8 +22,14 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-5">
         <Link
           href="/"
-          className="text-xl font-semibold tracking-tight text-white transition-colors hover:text-[var(--accent)]"
+          className="flex items-center gap-[0.35em] text-xl font-semibold tracking-tight text-white transition-colors hover:text-[var(--accent)]"
         >
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[0.95em] w-[0.95em] flex-none -translate-y-[0.04em] text-[var(--accent)]">
+            <rect x="2" y="12" width="3.8" height="8" rx="1" fill="currentColor" />
+            <rect x="7.2" y="9" width="3.8" height="11" rx="1" fill="currentColor" opacity=".8" />
+            <rect x="12.4" y="6.5" width="3.8" height="13.5" rx="1" fill="currentColor" opacity=".6" />
+            <rect x="17.6" y="4" width="3.8" height="16" rx="1" fill="currentColor" opacity=".4" />
+          </svg>
           DCF Studio
         </Link>
         {onCompanyPage && (
