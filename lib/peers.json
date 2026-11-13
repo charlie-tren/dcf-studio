@@ -1871,7 +1871,7 @@
  },
  "crosscheck": {
   "label": "Crosscheck",
-  "asOf": "2026-11-10",
+  "asOf": "2026-11-12",
   "tickers": [
    "A",
    "A2M.AX",
@@ -1917,7 +1917,6 @@
    "AMZN",
    "ANET",
    "ANN.AX",
-   "ANZ.AX",
    "AON",
    "AOS",
    "APA",
@@ -2261,7 +2260,6 @@
    "MTD",
    "MTS.AX",
    "MU",
-   "NAB.AX",
    "NCLH",
    "NDAQ",
    "NDSN",
