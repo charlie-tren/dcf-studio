@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { unstable_cache } from 'next/cache';
 import { Suspense } from 'react';
 import { AssumptionPanel } from '../components/AssumptionPanel';
 import { FlagList } from '../components/FlagList';
@@ -13,6 +14,17 @@ import { WaccTable } from '../components/WaccTable';
 import { priceInReportingCurrency } from '@/lib/fx';
 import { decodeState } from '@/lib/urlstate';
 import { buildValuation, type Valuation } from '@/lib/valuation';
+import { resolveRiskFree } from '@/lib/riskfree';
+import { fetchFxRate, fetchTicker } from '@/lib/yahoo';
+
+/* Every assumption change re-renders this page, so an uncached fetch pulled Yahoo again
+   on each click - most of the site's Vercel CPU (13/11/2026). An hour keeps the quoted
+   price current while a session's edits reuse one pull. */
+const cachedFetchTicker = unstable_cache(
+  async (ticker: string) => fetchTicker(ticker),
+  ['yahoo-ticker-page'],
+  { revalidate: 3600 }
+);
 
 type Props = {
   params: Promise<{ ticker: string }>;
@@ -65,7 +77,7 @@ export default async function ModelPage({ params, searchParams }: Props) {
       scenario: state.scenario,
       horizonYears: state.horizonYears,
       overrides: state.overrides,
-    });
+    }, { fetchTicker: cachedFetchTicker, fetchFxRate, resolveRiskFree: (t) => resolveRiskFree(t) });
   } catch (error) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-20">
