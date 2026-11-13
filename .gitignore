@@ -44,3 +44,7 @@ next-env.d.ts
 
 # contact sheets from tools/link_options.py - regenerate, do not commit
 tools/link_options.png
+
+# OpenNext / wrangler build output
+.open-next
+.wrangler
