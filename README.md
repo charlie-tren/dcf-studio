@@ -5,7 +5,7 @@ with every assumption on the surface and every line traceable back to the field 
 from.
 
 Live at **https://dcf.charlietrenorden.com** (also reachable at
-charlietrenorden.com/dcf-studio and dcf-studio.vercel.app).
+charlietrenorden.com/dcf-studio).
 
 ## Running locally
 
@@ -80,6 +80,9 @@ Australia (F2 capital market yields, the 10-year Australian Government series). 
 
 General information only, not financial advice. Not affiliated with Yahoo.
 
-<!-- visibility: this repo went PRIVATE on 18/08/2026. Vercel deploys private repos
-     fine via its GitHub App; this line exists because that had to be PROVEN by a real
-     push rather than assumed. -->
+## Deploy
+
+A static export (`output: "export"`) served by a Cloudflare Worker on the free plan.
+`ci.yml` builds and runs `wrangler deploy` on push to master, using repo secrets
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. `valuations.yml` runs nightly from the
+site-stats heartbeat and dispatches `ci.yml` to rebuild with the day's prices.
