@@ -47,6 +47,7 @@ const UNIVERSE = 'https://charlietrenorden.com/crosscheck/tickers.json';
  * like "the model cannot value these companies" rather than "we asked too fast".
  */
 const CONCURRENCY = 4;
+const RETRY_PAUSE_MS = 60_000;
 
 type Row = { ticker: string; ratio: number; price: number; currency: string };
 
@@ -87,7 +88,8 @@ async function main() {
   let dropped = 0;
   let declined = 0;
 
-  const results = await pool(tickers, CONCURRENCY, async (ticker): Promise<Row | null> => {
+  const retry: string[] = [];
+  const value = (lastTry: boolean) => async (ticker: string): Promise<Row | null> => {
     try {
       const v = await buildValuation(ticker, { scenario: 'base', horizonYears: 10 });
       // Before the ratio: a result the page calls the wrong tool is not a valuation
@@ -116,10 +118,20 @@ async function main() {
       // no statements, a currency with no rate, a blocked perpetuity. It is COUNTED,
       // because a run where that number jumps is the signal that something upstream
       // broke.
-      failed++;
+      if (lastTry) failed++;
+      else retry.push(ticker);
       return null;
     }
-  });
+  };
+
+  const results = await pool(tickers, CONCURRENCY, value(false));
+  // From 14/11/2026 Yahoo started refusing the last ~40 tickers of the run, every
+  // run, while each values fine on its own. One slow second pass recovers them.
+  if (retry.length) {
+    console.log(`retrying ${retry.length} after a pause`);
+    await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
+    results.push(...(await pool(retry, 1, value(true))));
+  }
 
   const rows = results.filter((r): r is Row => r !== null);
   const secs = (Date.now() - started) / 1000;
