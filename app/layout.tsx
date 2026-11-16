@@ -106,6 +106,7 @@ export default function RootLayout({
           try{out=!!localStorage.getItem(X)}catch(e){}
           if(!out)out=document.cookie.indexOf(C+"=1")>-1;
           if(out||navigator.webdriver)return;
+          var E=["pointermove","pointerdown","scroll","keydown","touchstart","wheel"],go=function(){if(go.d)return;go.d=1;E.forEach(function(e){removeEventListener(e,go,true)});
           var d=document,s;
           s=d.createElement("script");s.defer=true;
           s.src="https://static.cloudflareinsights.com/beacon.min.js";
@@ -113,7 +114,8 @@ export default function RootLayout({
           d.head.appendChild(s);
           s=d.createElement("script");s.defer=true;
           s.src="https://beacon.charlietrenorden.com/b.js";
-          d.head.appendChild(s);
+          d.head.appendChild(s);};
+          E.forEach(function(e){addEventListener(e,go,{capture:true,passive:true})});
           }catch(e){}})();
         `}</Script>
       </body>
