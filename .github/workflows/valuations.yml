@@ -20,7 +20,10 @@ name: Publish valuations
 # rebuilds the static site with the day's prices and deploys it.
 on:
   schedule:
+    # DST: 15:30 UTC is 02:30 AEDT / 01:30 AEST; the backup to the heartbeat's 18:00 UTC.
     - cron: "30 15 * * *"
+  repository_dispatch:
+    types: [heartbeat-valuations]
   workflow_dispatch:
 
 jobs:
