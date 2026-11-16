@@ -71,6 +71,8 @@ async function getSession(force: boolean): Promise<Session> {
 
 function reply(body: BodyInit | null, status: number, ttl: number, type: string | null): Response {
   const headers = new Headers({ 'Cache-Control': ttl > 0 && status === 200 ? `public, max-age=${ttl}` : 'no-store' });
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
   if (type) headers.set('Content-Type', type);
   return new Response(body, { status, headers });
 }
@@ -103,7 +105,7 @@ async function yahoo(target: URL, wait: (p: Promise<unknown>) => void): Promise<
         await res.body?.cancel();
         continue;
       }
-      return reply(res.body, res.status, ttl, res.headers.get('Content-Type'));
+      return reply(res.body, res.status, ttl, 'application/json; charset=utf-8');
     }
     return reply('Yahoo refused the request', 502, 0, 'text/plain');
   }, wait);
