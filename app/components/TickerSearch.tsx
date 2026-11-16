@@ -3,7 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { rankHits } from '@/lib/rank';
+import type { browserYahoo } from '@/lib/yahooBrowser';
+
 type Hit = { symbol: string; name: string; exchange: string };
+
+let api: Promise<ReturnType<typeof browserYahoo>> | null = null;
+const yahoo = () => (api ??= import('@/lib/yahooBrowser').then((m) => m.browserYahoo()));
 
 /**
  * `compact` is the header variant, used on a company page so a reader can look up
@@ -34,10 +40,9 @@ export function TickerSearch({ compact = false }: { compact?: boolean } = {}) {
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
-        const data = await res.json();
+        const found = rankHits(await (await yahoo()).searchTickers(term)).slice(0, 8);
         // Ignore a slow response that a newer keystroke has already superseded.
-        if (request === latest.current) setHits(data.hits ?? []);
+        if (request === latest.current) setHits(found);
       } catch {
         if (request === latest.current) setHits([]);
       } finally {

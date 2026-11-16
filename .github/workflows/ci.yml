@@ -1,18 +1,17 @@
 name: CI
 
-# DCF Studio had 221 tests and no workflow at all. It deploys on push, so until
-# now the valuation maths, the WACC and terminal-value code, the FX handling and
-# the backsolve could all break and reach the live site with nothing objecting.
-#
-# Same shape as crowdwise's CI, which is the house pattern for the Next projects.
-#
-# Hosting is a Cloudflare Worker built by OpenNext (moved off Vercel 13/11/2026).
-# A push to master deploys; every other run dry-runs the Worker bundle.
+# Hosting is a static export plus a small Worker (the Yahoo/RBA proxy and the shell for
+# tickers not built ahead), on the Cloudflare free plan since 11/2026. Each build bakes
+# that day's prices into ~610 pages, so master is also rebuilt daily: dispatched by
+# valuations.yml after it publishes, with the cron below as the backup.
 on:
   push:
     branches: [master]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # DST: 20:00 UTC is 07:00 AEDT / 06:00 AEST; either is fine.
+    - cron: "0 20 * * *"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -21,7 +20,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -30,11 +29,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test
-      - run: npx opennextjs-cloudflare build
+      - run: npm run build
       - if: github.ref != 'refs/heads/master'
         run: npx wrangler deploy --dry-run --outdir dist-dry
-      - if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+      - if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx opennextjs-cloudflare deploy
+        run: npx wrangler deploy

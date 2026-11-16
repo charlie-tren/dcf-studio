@@ -15,17 +15,9 @@ name: Publish valuations
 # hope rather than a guarantee and the consumer is built not to need it. Crosscheck
 # reads whatever valuations.json is currently published and does not wait.
 #
-# NO HEARTBEAT TRIGGER, and that is not an oversight. The Worker that fires the rest of
-# the estate from outside GitHub holds a classic PAT scoped `public_repo`, and this
-# repository is private, so a dispatch here would 404 on every attempt with the only
-# symptom being a job that never runs. Adding the trigger would look like a safety net
-# and be nothing of the kind. If this job ever needs to be punctual, the fix is a token
-# with `repo` scope, which is a real decision about blast radius rather than a config
-# line - the same token reaches eight repositories across three accounts.
-#
-# What that costs today: nothing that shows. The universe moves by a handful of names a
-# week and the column is an ordering, so a late run means the same ranking arrives a few
-# hours later, not a wrong one.
+# The site-stats heartbeat Worker also dispatches this job (the repo is public since
+# 11/2026, so its `public_repo` PAT reaches it). The last step dispatches CI, which
+# rebuilds the static site with the day's prices and deploys it.
 on:
   schedule:
     - cron: "30 15 * * *"
@@ -39,6 +31,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -79,3 +72,9 @@ jobs:
           done
           echo "::error::could not push after 3 attempts"
           exit 1
+
+      # Runs whether or not the numbers moved: the pages carry the day's prices either way.
+      - name: Rebuild and deploy the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref master --repo "$GITHUB_REPOSITORY"

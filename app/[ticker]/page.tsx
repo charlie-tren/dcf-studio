@@ -1,37 +1,35 @@
-import Link from 'next/link';
-import { unstable_cache } from 'next/cache';
 import { Suspense } from 'react';
-import { AssumptionPanel } from '../components/AssumptionPanel';
-import { FlagList } from '../components/FlagList';
-import { ExcessReturnsPanel } from '../components/ExcessReturnsPanel';
-import { ForecastTable } from '../components/ForecastTable';
-import { Headline } from '../components/Headline';
-import { ImpliedPanel } from '../components/ImpliedPanel';
-import { SensitivityTable } from '../components/SensitivityTable';
-import { TerminalComparison } from '../components/TerminalComparison';
-import { ValueBar } from '../components/ValueBar';
-import { WaccTable } from '../components/WaccTable';
-import { priceInReportingCurrency } from '@/lib/fx';
-import { decodeState } from '@/lib/urlstate';
-import { buildValuation, type Valuation } from '@/lib/valuation';
+import type { Metadata } from 'next';
 import { resolveRiskFree } from '@/lib/riskfree';
+import { recordingDeps, type Snapshot } from '@/lib/snapshot';
+import { defaults } from '@/lib/urlstate';
+import { buildValuation, type Valuation } from '@/lib/valuation';
 import { fetchFxRate, fetchTicker } from '@/lib/yahoo';
+import { ModelBody } from './ModelBody';
+import { ModelLoading, TickerView } from './TickerView';
 
-/* Every assumption change re-renders this page, so an uncached fetch pulled Yahoo again
-   on each click - most of the site's Vercel CPU (13/11/2026). An hour keeps the quoted
-   price current while a session's edits reuse one pull. */
-const cachedFetchTicker = unstable_cache(
-  async (ticker: string) => fetchTicker(ticker),
-  ['yahoo-ticker-page'],
-  { revalidate: 3600 }
-);
+/* Built ahead: Crosscheck's universe plus the landing page's examples. Any other
+   ticker is served by the Worker's shell and modelled in the browser. */
+const UNIVERSE = 'https://charlietrenorden.com/crosscheck/tickers.json';
+const EXAMPLES = ['GOOGL', 'BHP.AX', 'SHEL.L', 'ARB.AX'];
 
-type Props = {
-  params: Promise<{ ticker: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
+export const dynamicParams = false;
 
-export async function generateMetadata({ params }: Props) {
+export async function generateStaticParams() {
+  const res = await fetch(UNIVERSE, { headers: { 'User-Agent': 'dcf-studio-build' } });
+  if (!res.ok) throw new Error(`${UNIVERSE} answered ${res.status}`);
+  const manifest = (await res.json()) as { tickers: (string | { symbol?: string; ticker?: string })[] };
+  const tickers = new Set(EXAMPLES);
+  for (const t of manifest.tickers) {
+    const symbol = typeof t === 'string' ? t : (t.symbol ?? t.ticker);
+    if (symbol) tickers.add(symbol.toUpperCase());
+  }
+  return [...tickers].map((ticker) => ({ ticker }));
+}
+
+type Props = { params: Promise<{ ticker: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { ticker } = await params;
   const symbol = decodeURIComponent(ticker).toUpperCase();
   const description = `Discounted cashflow valuation of ${symbol}, with every assumption and intermediate line visible.`;
@@ -62,133 +60,27 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
-export default async function ModelPage({ params, searchParams }: Props) {
-  const { ticker } = await params;
-  const raw = await searchParams;
+export default async function ModelPage({ params }: Props) {
+  const ticker = decodeURIComponent((await params).ticker).toUpperCase();
 
-  const query = new URLSearchParams(
-    Object.entries(raw).flatMap(([k, v]) => (typeof v === 'string' ? [[k, v] as [string, string]] : []))
-  ).toString();
-  const state = decodeState(query);
-
-  let valuation: Valuation;
+  let snapshot: Snapshot | null = null;
+  let initial: Valuation | null = null;
   try {
-    valuation = await buildValuation(decodeURIComponent(ticker), {
-      scenario: state.scenario,
-      horizonYears: state.horizonYears,
-      overrides: state.overrides,
-    }, { fetchTicker: cachedFetchTicker, fetchFxRate, resolveRiskFree: (t) => resolveRiskFree(t) });
-  } catch (error) {
-    return (
-      <main className="mx-auto max-w-3xl px-6 py-20">
-        <h1 className="text-2xl font-semibold text-white">
-          Cannot model {decodeURIComponent(ticker)}
-        </h1>
-        <p className="mt-3 text-[var(--text-dim)]">
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </p>
-        <Link
-          href="/"
-          className="mt-6 inline-block text-sm text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"
-        >
-          Search for another company
-        </Link>
-      </main>
-    );
+    const rec = recordingDeps({ fetchTicker, fetchFxRate, resolveRiskFree: (t) => resolveRiskFree(t) });
+    initial = await buildValuation(ticker, defaults(), rec.deps);
+    snapshot = rec.snapshot();
+  } catch {
+    // Left to the browser, which shows the same error the server used to if it still fails.
   }
 
-  const reportingCurrency = valuation.fundamentals.reportingCurrency;
-
-  // The sensitivity grid holds reporting-currency values, so bring the quoted
-  // price back into reporting terms before comparing them.
-  const priceInReporting = priceInReportingCurrency(valuation.fundamentals.price, {
-    reportingCurrency,
-    quoteCurrency: valuation.fundamentals.quoteCurrency,
-    fxRate: valuation.fxRate,
-  });
-
-  const exportQuery = new URLSearchParams(query);
-  exportQuery.set('ticker', decodeURIComponent(ticker));
-
   return (
-    <main className="mx-auto max-w-5xl space-y-12 px-6 py-10">
-      <Headline v={valuation} />
-
-      {valuation.flags.length > 0 && <FlagList flags={valuation.flags} />}
-      {valuation.notes.length > 0 && (
-        <div className="space-y-1">
-          {valuation.notes.map((note) => (
-            <p key={note} className="text-sm text-[var(--text-faint)]">
-              {note}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {valuation.excessReturns ? (
-        <>
-          <ExcessReturnsPanel
-            er={valuation.excessReturns}
-            currency={reportingCurrency}
-            yearLabels={valuation.forecastYearLabels}
-          />
-          <WaccTable w={valuation.wacc} currency={reportingCurrency} equityOnly />
-        </>
-      ) : (
-        <>
-        <ValueBar v={valuation} />
-
-        <Suspense fallback={null}>
-          <AssumptionPanel
-            assumptions={valuation.assumptions}
-            scenario={valuation.scenario}
-            modified={valuation.modified}
-          />
-        </Suspense>
-
-        <ForecastTable
-          dcf={valuation.dcf}
-          currency={reportingCurrency}
-          yearLabels={valuation.forecastYearLabels}
-        />
-        <WaccTable w={valuation.wacc} currency={reportingCurrency} />
-        <TerminalComparison v={valuation} />
-        <SensitivityTable
-          grid={valuation.sensitivity}
-          currency={reportingCurrency}
-          centrePrice={priceInReporting}
-        />
-        <ImpliedPanel
-          implied={valuation.implied}
-          assumptions={valuation.assumptions}
-          delivered={valuation.delivered}
-        />
-        </>
-      )}
-
-      <div className="border-t border-[var(--border)] pt-6">
-        <a
-          href={`/api/export?${exportQuery.toString()}`}
-          className="inline-flex items-center gap-2 rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--text-dim)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
-        >
-          Download as Excel
-          <span aria-hidden="true">↓</span>
-        </a>
-        <p className="mt-2 text-xs text-[var(--text-faint)]">
-          Live formulas, not pasted numbers - edit a driver and the workbook reprices.
-        </p>
-      </div>
-
-      <p className="text-sm leading-relaxed text-[var(--text-faint)]">
-        Yahoo Finance and RBA data. General information, not advice.{' '}
-        <Link
-          href="/methodology"
-          className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:no-underline"
-        >
-          Methodology
-        </Link>
-        .
-      </p>
-    </main>
+    <Suspense fallback={initial ? <ModelBody valuation={initial} /> : <ModelLoading ticker={ticker} />}>
+      <TickerView
+        ticker={ticker}
+        snapshot={snapshot}
+        initial={initial}
+        builtOn={new Date().toISOString().slice(0, 10)}
+      />
+    </Suspense>
   );
 }

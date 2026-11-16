@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import type { Assumptions, ScenarioName } from '@/lib/types';
 
@@ -45,24 +44,22 @@ function AssumptionPanelInner({
   scenario: ScenarioName;
   modified: boolean;
 }) {
-  const router = useRouter();
-  const params = useSearchParams();
   const [pending, startTransition] = useTransition();
 
   // Slider positions and the active scenario update instantly on interaction;
-  // the server then recomputes. Without this the whole panel waits on a round
+  // the model then recomputes. Without this the whole panel waits on a round
   // trip and every click feels broken.
   //
   // Draft state is discarded by remounting on a key derived from the server's
-  // answer (see the wrapper at the bottom of this file), not by clearing it in
+  // result (see the wrapper at the bottom of this file), not by clearing it in
   // an effect - a setState inside an effect triggers a cascading render.
   const [draft, setDraft] = useState<Partial<Record<string, number>>>({});
   const [optimisticScenario, setOptimisticScenario] = useState<ScenarioName | null>(null);
 
   function push(changes: Record<string, string>) {
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(window.location.search);
     for (const [k, v] of Object.entries(changes)) next.set(k, v);
-    startTransition(() => router.push(`?${next.toString()}`, { scroll: false }));
+    startTransition(() => window.history.pushState(null, '', `?${next.toString()}`));
   }
 
   function chooseScenario(key: ScenarioName) {
@@ -72,7 +69,7 @@ function AssumptionPanelInner({
     next.set('scenario', key);
     next.set('horizon', String(assumptions.horizonYears));
     if (assumptions.midYearConvention === false) next.set('mid', '0');
-    startTransition(() => router.push(`?${next.toString()}`, { scroll: false }));
+    startTransition(() => window.history.pushState(null, '', `?${next.toString()}`));
   }
 
   function reset() {
@@ -81,7 +78,7 @@ function AssumptionPanelInner({
     const next = new URLSearchParams();
     next.set('scenario', scenario);
     next.set('horizon', String(assumptions.horizonYears));
-    startTransition(() => router.push(`?${next.toString()}`, { scroll: false }));
+    startTransition(() => window.history.pushState(null, '', `?${next.toString()}`));
   }
 
   const shownScenario = optimisticScenario ?? scenario;

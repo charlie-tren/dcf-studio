@@ -80,3 +80,9 @@ export function decodeState(query: string): UrlState {
 
   return { scenario, horizonYears, overrides };
 }
+
+/** The model a bare /<ticker> URL shows. */
+export function defaults(): Pick<UrlState, 'scenario' | 'horizonYears'> {
+  const { scenario, horizonYears } = decodeState('');
+  return { scenario, horizonYears };
+}
