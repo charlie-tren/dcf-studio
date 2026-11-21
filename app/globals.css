@@ -136,7 +136,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .scroll-subtle::-webkit-scrollbar-thumb:hover {
   background: var(--text-faint);
 }
-/* Phones: 16px stops iOS zooming into a field; the back link gets a finger-sized hit area. */
+/* Phones: 16px stops iOS zooming into a field, and a slider is 28px to the finger
+   while its track still draws at 6px. */
 @media (pointer: coarse) {
   input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px !important; }
+  input[type="range"] { display: block; height: 28px; margin: 0 0 -4px; background: transparent; border: 0; }
+  input[type="range"]::-webkit-slider-runnable-track {
+    box-sizing: border-box; height: 6px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 999px;
+  }
+  input[type="range"]::-webkit-slider-thumb { margin-top: -6px; }
 }
