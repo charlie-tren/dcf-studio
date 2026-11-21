@@ -58,7 +58,7 @@ export function SiteHeader() {
             rel="noopener noreferrer"
             className="text-[var(--text-dim)] transition-colors hover:text-[var(--text)]"
           >
-            <span aria-hidden="true">←</span>&nbsp;Other projects
+            <span aria-hidden="true" style={{ fontSize: "calc(1em + 1.5px)", position: "relative", top: "-1.5px" }}>←</span>&nbsp;Other projects
           </a>
         </nav>
       </div>
