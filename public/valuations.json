@@ -1,14 +1,14 @@
 {
  "site": "DCF Studio",
  "url": "https://dcf.charlietrenorden.com/",
- "as_of": "2026-11-21",
+ "as_of": "2026-11-22",
  "measure": "implied value per share divided by market price, base case, 10-year forecast",
  "note": "An ORDERING, not a fair value. This model on defaults runs systematically below market prices, so rank these rather than printing them.",
  "attempted": 636,
- "published": 512,
+ "published": 519,
  "declined_by_model": 36,
- "dropped_implausible": 49,
- "could_not_model": 39,
+ "dropped_implausible": 50,
+ "could_not_model": 31,
  "ratios": {
   "A": 0.3889,
   "A2M.AX": 0.7888,
@@ -521,7 +521,14 @@
   "VRSK": 0.8836,
   "VRSN": 0.7454,
   "VRT": 0.6188,
-  "VST": 0.5681
+  "VRTX": 0.6871,
+  "VST": 0.4618,
+  "VTR": 0.1013,
+  "VZ": 2.1296,
+  "WAB": 0.3441,
+  "WAF.AX": 2.3975,
+  "WAT": 0.7434,
+  "WBC.AX": 0.6924
  },
  "prices": {
   "A": [
@@ -2568,9 +2575,37 @@
    166.24,
    "USD"
   ],
+  "VRTX": [
+   515.02,
+   "USD"
+  ],
   "VST": [
    115.25,
    "USD"
+  ],
+  "VTR": [
+   86.55,
+   "USD"
+  ],
+  "VZ": [
+   46.48,
+   "USD"
+  ],
+  "WAB": [
+   269.31,
+   "USD"
+  ],
+  "WAF.AX": [
+   3.04,
+   "AUD"
+  ],
+  "WAT": [
+   440.45,
+   "USD"
+  ],
+  "WBC.AX": [
+   35.94,
+   "AUD"
   ]
  }
 }
