@@ -7,6 +7,7 @@ shipped.
 
 | ID | Item | Score | Owner | Build | Prerequisites | Notes |
 |---|---|---|---|---|---|---|
+| 2 | Price vs fair value chart, Morningstar style | 3.2 | Auto | 2-4 hours | None (row 1 for 10+ years of US history) | The model rerun at each past quarter, plotted against price with over/under-valued shading and a yearly Price/Fair Value row. Reference build: the morningstar-chart skill. |
 | 1 | Longer US history via SEC EDGAR | 2.2 | Auto | 2 days | None | Ragged tag coverage per line, US only. With consensus now setting years 1-2, history only sets the margin and capex anchors, so the case is weaker than before. |
 
 ## Shipped
@@ -28,6 +29,7 @@ shipped.
 
 ## Item details
 
+- [ ] **Price vs fair value chart, Morningstar style** (asked 23/11/2026). Black price line, red stepped fair-value line, orange / grey / blue shading for over / fairly / under-valued, and yearly columns under the chart (Price/Fair Value, total return, index return, then the financials). Each past fair value uses only what was filed by then. Reference build: `~/.claude/skills/morningstar-chart/scripts/build.py` (SEC XBRL, first-filed values, split-adjusted shares, stale debt dropped after 100 days). Yahoo gives 4-5 years here; row 1 extends US names.
 - [x] **Add DCF Studio to the personal website** - DONE 30/07/2026 by Charlie himself
   (commit 6506f39 in the hub repo, verified live on charlie-tren.github.io linking to
   dcf-studio.vercel.app with a dcf-studio.png thumbnail). This item was stale - written
